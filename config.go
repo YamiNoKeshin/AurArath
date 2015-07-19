@@ -2,6 +2,7 @@ package aurarath
 
 import (
 	"io"
+	"net"
 	"os"
 )
 
@@ -13,12 +14,26 @@ type Config struct {
 }
 
 func DefaultConfig() *Config {
-	return &Config{
-		LogOutput:         "stderr",
-		NetworkInterfaces: []string{"eth0"},
-
-		logger: os.Stderr,
+	config := Config{
+		LogOutput: "stderr",
+		logger:    os.Stderr,
 	}
+
+	interfaces, err := net.Interfaces()
+
+	if err != nil {
+		return nil
+	}
+
+	var networkInterfaces []string
+
+	for _, iface := range interfaces {
+		append(networkInterfaces, iface.Name)
+	}
+
+	config.NetworkInterfaces = networkInterfaces
+
+	return &config
 }
 
 func (c *Config) Logger() io.Writer {

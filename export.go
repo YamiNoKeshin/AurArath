@@ -4,13 +4,16 @@ import "github.com/YamiNoKeshin/aurarath/network"
 
 type Export struct {
 	AppKey *AppKey
-	node   *network.Node
+	nodes  []*network.Node
 }
 
 func NewExport(config *Config, key *AppKey) {
 	exp := Export{
 		AppKey: key,
-		node:   network.NewNode(config),
+	}
+
+	for _, iface := range config.NetworkInterfaces {
+		append(exp.nodes, network.NewNode(iface, config.Logger()))
 	}
 
 	return &exp
