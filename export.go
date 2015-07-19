@@ -13,7 +13,7 @@ func NewExport(config *Config, key *AppKey) {
 	}
 
 	for _, iface := range config.NetworkInterfaces {
-		append(exp.nodes, network.NewNode(iface, config.Logger()))
+		exp.nodes = append(exp.nodes, network.NewNode(iface, config.Logger()))
 	}
 
 	return &exp

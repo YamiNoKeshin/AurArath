@@ -13,7 +13,7 @@ func NewImport(config *Config, key *AppKey) *Import {
 	}
 
 	for _, iface := range config.NetworkInterfaces {
-		append(imp.nodes, network.NewNode(iface, config.Logger()))
+		imp.nodes = append(imp.nodes, network.NewNode(iface, config.Logger()))
 	}
 
 	return &imp

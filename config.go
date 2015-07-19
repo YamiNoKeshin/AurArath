@@ -28,7 +28,7 @@ func DefaultConfig() *Config {
 	var networkInterfaces []string
 
 	for _, iface := range interfaces {
-		append(networkInterfaces, iface.Name)
+		networkInterfaces = append(networkInterfaces, iface.Name)
 	}
 
 	config.NetworkInterfaces = networkInterfaces
