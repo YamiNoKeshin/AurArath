@@ -26,34 +26,21 @@ func NewNode(interfaceName string, logger io.Writer) *Node {
 
 	hostname, _ := os.Hostname()
 
-	var iface *net.Interface
-	iface, err = net.InterfaceByName(interfaceName)
-
-	if err != nil {
-		iface, err = net.InterfaceByIndex(0)
-
-		if err != nil {
-			//Log
-		}
-	}
-
-	var addresses []net.Addr
-
-	addresses, err = iface.Addrs()
+	iface, err := net.InterfaceByName(interfaceName)
 
 	if err != nil {
 		return nil
 	}
 
-	var bind net.Addr
+	addresses, err := iface.Addrs()
 
-	if len(addresses) > 1 {
-		bind = addresses[0] // If the interface has more than one address, we should take the first one
+	if err != nil {
+		return nil
 	}
 
-	var mDNSAgent agent.AgentMDNS
+	bind := addresses[0] // If the interface has more than one address, we should take the first one
 
-	mDNSAgent, err = agent.NewAgentMDNS(agent, logger, false, hostname, "AurArath", iface, net.ParseIP(bind.String()), 42000)
+	mDNSAgent, err := agent.NewAgentMDNS(serfAgent, logger, false, hostname, "AurArath", iface, net.ParseIP(bind.String()), 42000)
 
 	if err != nil {
 		return nil
