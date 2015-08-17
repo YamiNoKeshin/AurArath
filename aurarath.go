@@ -1,10 +1,12 @@
 package aurarath
 
+import "github.com/joernweissenborn/aurarath/config"
+
 type AurArath struct {
-	config *Config
+	config *config.Config
 }
 
-func New(config *Config) (aurarath *AurArath) {
+func New(config *config.Config) (aurarath *AurArath) {
 	aurarath.config = config
 	return
 }

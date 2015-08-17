@@ -1,19 +1,18 @@
 package aurarath
 
-import "github.com/YamiNoKeshin/aurarath/network"
+import (
+	"github.com/joernweissenborn/aurarath/config"
+	"github.com/joernweissenborn/aurarath/network/node"
+)
 
 type Import struct {
 	AppKey *AppKey
-	nodes  []*network.Node
+	node  *node.Node
 }
 
-func NewImport(config *Config, key *AppKey) *Import {
+func NewImport(config *config.Config, key *AppKey) *Import {
 	imp := Import{
 		AppKey: key,
-	}
-
-	for _, iface := range config.NetworkInterfaces {
-		append(imp.nodes, network.NewNode(iface, config.Logger()))
 	}
 
 	return &imp

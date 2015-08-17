@@ -1,17 +1,10 @@
 package aurarath
 
-import "github.com/YamiNoKeshin/aurarath/network"
+import "github.com/joernweissenborn/aurarath/network/node"
+
 
 type Export struct {
 	AppKey *AppKey
-	node   *network.Node
+	node   *node.Node
 }
 
-func NewExport(config *Config, key *AppKey) {
-	exp := Export{
-		AppKey: key,
-		node:   network.NewNode(config),
-	}
-
-	return &exp
-}
