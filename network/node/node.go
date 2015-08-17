@@ -4,16 +4,19 @@ import (
 	"github.com/hashicorp/serf/command/agent"
 	"github.com/hashicorp/serf/serf"
 	"net"
-	"os"
 	"fmt"
 	uuid "github.com/nu7hatch/gouuid"
 
 	"github.com/joernweissenborn/aurarath/config"
 	"github.com/joernweissenborn/eventual2go"
 	"strings"
+	"time"
+	"sync"
 )
 
 type Node struct {
+	mut *sync.RWMutex
+
 	UUID string
 
 	cfg *config.Config
@@ -38,6 +41,7 @@ func New(cfg *config.Config, tags map[string]string) (node *Node) {
 	node.UUID = id.String()
 
 	node.knownPeers = make(map[string][]string)
+	node.mut = new(sync.RWMutex)
 	node.eventHandler = newEventHandler()
 	node.eventHandler.join.Listen(node.newPeer)
 	node.eventHandler.leave.Listen(node.leftPeer)
@@ -50,11 +54,15 @@ func New(cfg *config.Config, tags map[string]string) (node *Node) {
 }
 
 func (n *Node) newPeer(d eventual2go.Data){
+	n.mut.Lock()
+	defer  n.mut.Unlock()
 	peerid := strings.Split(d.(serf.Member).Name,"@")[0]
 	peerip :=d.(serf.Member).Addr.String()
 	n.knownPeers[peerid] = append(n.knownPeers[peerid],peerip)
 }
 func (n *Node) leftPeer(d eventual2go.Data){
+	n.mut.Lock()
+	defer  n.mut.Unlock()
 	peerid := strings.Split(d.(serf.Member).Name,"@")[0]
 	peerip :=d.(serf.Member).Addr.String()
 	old := n.knownPeers[peerid]
@@ -94,6 +102,11 @@ func (n *Node) createSerfAgent(iface string) {
 
 	serfConfig.NodeName = fmt.Sprintf("%s@%s",n.UUID,iface)
 	serfConfig.LogOutput = n.cfg.Logger()
+	                                               // Set probe intervals that are aggressive for finding bad nodes
+	serfConfig.MemberlistConfig.GossipInterval = 5 * time.Millisecond
+	serfConfig.MemberlistConfig.ProbeInterval = 50 * time.Millisecond
+	serfConfig.MemberlistConfig.ProbeTimeout = 25 * time.Millisecond
+	serfConfig.MemberlistConfig.SuspicionMult = 1
 	serfConfig.Init()
 	agentConfig := agent.DefaultConfig()
 
@@ -141,14 +154,11 @@ func (n *Node) createMDNSAgent(ifaceAddr string) {
 	iface:= ifaces[index]
 
 
-	hostname, err := os.Hostname()
-	if !n.handleErr(err) {
-		return
-	}
+	 var err error
 	agt := n.agents[ifaceAddr]
-	n.mDNSAgents[ifaceAddr], err = agent.NewAgentMDNS(agt, n.cfg.Logger(), false, hostname, "AurArath",
+	n.mDNSAgents[ifaceAddr], err = agent.NewAgentMDNS(agt, n.cfg.Logger(), false, n.UUID, "AurArath",
 		&iface, net.ParseIP(agt.SerfConfig().MemberlistConfig.BindAddr), agt.SerfConfig().MemberlistConfig.BindPort)
-
+	n.handleErr(err)
 
 }
 

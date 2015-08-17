@@ -11,6 +11,10 @@ func New(config *config.Config) (aurarath *AurArath) {
 	return
 }
 
-func (*AurArath) AddImport(appkey *AppKey) (imp *Import)
+func (*AurArath) AddImport(appkey *AppKey) (imp *Import){
+	return nil
+}
 
-func (*AurArath) AddExport(appkey *AppKey) (exp *Export)
+func (*AurArath) AddExport(appkey *AppKey) (exp *Export){
+	return nil
+}
