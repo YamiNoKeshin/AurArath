@@ -19,9 +19,9 @@ func TestNodeDiscover(t *testing.T){
 	defer n2.Shutdown()
 	j2 := n2.Join().AsChan()
 	n2.Run()
-
+	t.Log(n1.UUID,n2.UUID)
 	select {
-	case <-time.After(5 * time.Second):
+	case <-time.After(10 * time.Second):
 		t.Fatal("Couldnt find node 1")
 	case data := <-j1:
 		if !strings.Contains(data.(serf.Member).Name,n2.UUID) {
@@ -47,8 +47,8 @@ func TestNodeLeave(t *testing.T){
 
 	n2 := node.New(config.DefaultLocalhost(),nil)
 	n2.Run()
-	time.Sleep(1 *time.Second)
-	n2.Shutdown()
+	time.Sleep(2 *time.Second)
+	n2.Leave()
 	n2.Shutdown()
 
 	select {

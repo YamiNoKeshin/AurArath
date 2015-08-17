@@ -23,9 +23,9 @@ type Node struct {
 	agents     map[string]*agent.Agent
 	mDNSAgents map[string] *agent.AgentMDNS
 
-	newPeers eventual2go.StreamController
 	eventHandler eventHandler
 
+	knownPeers map[string][]string // A map from peer UUID to IPs
 }
 
 func New(cfg *config.Config, tags map[string]string) (node *Node) {
@@ -37,14 +37,33 @@ func New(cfg *config.Config, tags map[string]string) (node *Node) {
 	id, _ := uuid.NewV4()
 	node.UUID = id.String()
 
+	node.knownPeers = make(map[string][]string)
 	node.eventHandler = newEventHandler()
+	node.eventHandler.join.Listen(node.newPeer)
+	node.eventHandler.leave.Listen(node.leftPeer)
 
 	node.createSerfAgents()
 
 
-	node.newPeers = eventual2go.NewStreamController()
 
 	return node
+}
+
+func (n *Node) newPeer(d eventual2go.Data){
+	peerid := strings.Split(d.(serf.Member).Name,"@")[0]
+	peerip :=d.(serf.Member).Addr.String()
+	n.knownPeers[peerid] = append(n.knownPeers[peerid],peerip)
+}
+func (n *Node) leftPeer(d eventual2go.Data){
+	peerid := strings.Split(d.(serf.Member).Name,"@")[0]
+	peerip :=d.(serf.Member).Addr.String()
+	old := n.knownPeers[peerid]
+	n.knownPeers[peerid] = []string{}
+	for _, ip := range old {
+		if ip != peerip {
+			n.knownPeers[peerid] = append(n.knownPeers[peerid],ip)
+		}
+	}
 }
 
 func (n *Node) Run()  {
@@ -82,25 +101,19 @@ func (n *Node) createSerfAgent(iface string) {
 
 	if n.handleErr(err) {
 		agt.RegisterEventHandler(n.eventHandler)
-
 		n.agents[iface] = agt
 
 	}
 }
 
 func (n *Node) Join() eventual2go.Stream {
-	return n.eventHandler.join.Transform(toMember).WhereNot(func(d eventual2go.Data)bool{
+	return n.eventHandler.join.WhereNot(func(d eventual2go.Data)bool{
 		return strings.Contains(d.(serf.Member).Name,n.UUID)
 	})
 }
 
-func toMember(d eventual2go.Data)eventual2go.Data{
-	fmt.Println(d)
-	return d.(serf.MemberEvent).Members[0]
-	}
-
 func (n *Node) Leave() eventual2go.Stream {
-	return n.eventHandler.leave.Transform(toMember)
+	return n.eventHandler.leave
 }
 
 
@@ -139,6 +152,11 @@ func (n *Node) createMDNSAgent(ifaceAddr string) {
 
 }
 
+func (n *Node) QueryPeer(UUID string) {
+
+
+
+}
 func (n *Node) Shutdown() {
 	for _, agt := range n.agents{
 		agt.Leave()
