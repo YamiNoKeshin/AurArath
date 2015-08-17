@@ -154,9 +154,6 @@ func (n *Node) handleErr(err error) (ok bool){
 	return
 }
 
-
-
-
 func getRandomPort(iface string) (int) {
 	l, err := net.Listen("tcp", fmt.Sprintf("%s:0",iface))
 	if err != nil {
