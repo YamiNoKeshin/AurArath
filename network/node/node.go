@@ -41,16 +41,18 @@ func New(cfg *config.Config, tags map[string]string) (node *Node) {
 
 	node.createSerfAgents()
 
-	node.createMDNSAgents()
-
 
 	node.newPeers = eventual2go.NewStreamController()
 
 	return node
 }
 
-func (n *Node) NewPeers() eventual2go.StreamController {
-	return n.newPeers
+func (n *Node) Run()  {
+	for _,agt := range n.agents {
+		agt.Start()
+	}
+	n.createMDNSAgents()
+	return
 }
 
 func (n *Node) createSerfAgents() {
@@ -72,15 +74,14 @@ func (n *Node) createSerfAgent(iface string) {
 	serfConfig.MemberlistConfig.BindPort = getRandomPort(iface)
 
 	serfConfig.NodeName = fmt.Sprintf("%s@%s",n.UUID,iface)
-
+	serfConfig.LogOutput = n.cfg.Logger()
 	serfConfig.Init()
 	agentConfig := agent.DefaultConfig()
-	agentConfig.LogLevel = "info"
+
 	agt, err := agent.Create(agentConfig, serfConfig, n.cfg.Logger())
 
 	if n.handleErr(err) {
 		agt.RegisterEventHandler(n.eventHandler)
-		agt.Start()
 
 		n.agents[iface] = agt
 
@@ -88,10 +89,18 @@ func (n *Node) createSerfAgent(iface string) {
 }
 
 func (n *Node) Join() eventual2go.Stream {
-	return n.eventHandler.join
+	return n.eventHandler.join.Transform(toMember).WhereNot(func(d eventual2go.Data)bool{
+		return strings.Contains(d.(serf.Member).Name,n.UUID)
+	})
 }
+
+func toMember(d eventual2go.Data)eventual2go.Data{
+	fmt.Println(d)
+	return d.(serf.MemberEvent).Members[0]
+	}
+
 func (n *Node) Leave() eventual2go.Stream {
-	return n.eventHandler.leave
+	return n.eventHandler.leave.Transform(toMember)
 }
 
 
@@ -132,6 +141,7 @@ func (n *Node) createMDNSAgent(ifaceAddr string) {
 
 func (n *Node) Shutdown() {
 	for _, agt := range n.agents{
+		agt.Leave()
 		agt.Shutdown()
 	}
 }

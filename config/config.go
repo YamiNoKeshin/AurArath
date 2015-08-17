@@ -2,9 +2,10 @@ package config
 
 import (
 	"io"
-	"os"
 	"net"
 	"strings"
+	"io/ioutil"
+	"os"
 )
 
 func Default() *Config {
@@ -20,6 +21,18 @@ func Default() *Config {
 	return &Config{
 		NetworkInterfaces: ifaceNames,
 
+		logger: ioutil.Discard,
+		//logger: os.Stderr,
+
+	}
+}
+
+func DefaultLocalhost() *Config {
+
+	return &Config{
+		NetworkInterfaces: []string{"127.0.0.1"},
+
+		//logger: ioutil.Discard,
 		logger: os.Stderr,
 
 	}

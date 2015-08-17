@@ -3,7 +3,6 @@ package node
 import (
 	"github.com/joernweissenborn/eventual2go"
 	"github.com/hashicorp/serf/serf"
-	"fmt"
 )
 
 func newEventHandler() (eh eventHandler){
@@ -28,6 +27,5 @@ func isJoin(d eventual2go.Data) (is bool){
 }
 
 func isLeave(d eventual2go.Data) (is bool){
-	fmt.Println("DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDdd",d)
 	return d.(serf.Event).EventType() == serf.EventMemberLeave || d.(serf.Event).EventType() == serf.EventMemberFailed
 }
