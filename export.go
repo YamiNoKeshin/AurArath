@@ -8,7 +8,7 @@ type Export struct {
 }
 
 func NewExport(config *Config, key *AppKey) {
-	exp := Export{
+	exp := &Export{
 		AppKey: key,
 	}
 
@@ -16,5 +16,5 @@ func NewExport(config *Config, key *AppKey) {
 		exp.nodes = append(exp.nodes, network.NewNode(iface, config.Logger()))
 	}
 
-	return &exp
+	return exp
 }

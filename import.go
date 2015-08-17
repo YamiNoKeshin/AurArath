@@ -8,7 +8,7 @@ type Import struct {
 }
 
 func NewImport(config *Config, key *AppKey) *Import {
-	imp := Import{
+	imp := &Import{
 		AppKey: key,
 	}
 
@@ -16,7 +16,7 @@ func NewImport(config *Config, key *AppKey) *Import {
 		imp.nodes = append(imp.nodes, network.NewNode(iface, config.Logger()))
 	}
 
-	return &imp
+	return imp
 }
 
 func (*Import) AddFunction(fkt *Function)
