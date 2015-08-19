@@ -10,8 +10,10 @@ import (
 	"github.com/joernweissenborn/aurarath/config"
 	"github.com/joernweissenborn/eventual2go"
 	"strings"
-	"time"
 	"sync"
+	"github.com/joernweissenborn/aurarath/network/beacon"
+	"time"
+	"log"
 )
 
 type Node struct {
@@ -28,7 +30,11 @@ type Node struct {
 
 	eventHandler eventHandler
 
+	beacons []beacon.Beacon
+
 	knownPeers map[string][]string // A map from peer UUID to IPs
+
+	logger *log.Logger
 }
 
 func New(cfg *config.Config, tags map[string]string) (node *Node) {
@@ -39,8 +45,9 @@ func New(cfg *config.Config, tags map[string]string) (node *Node) {
 
 	id, _ := uuid.NewV4()
 	node.UUID = id.String()
-
+	node.logger = log.New(cfg.Logger(),"Node",log.Lshortfile)
 	node.knownPeers = make(map[string][]string)
+	node.beacons = []beacon.Beacon{}
 	node.mut = new(sync.RWMutex)
 	node.eventHandler = newEventHandler()
 	node.eventHandler.join.Listen(node.newPeer)
@@ -54,6 +61,7 @@ func New(cfg *config.Config, tags map[string]string) (node *Node) {
 }
 
 func (n *Node) newPeer(d eventual2go.Data){
+	n.silenceBeacons()
 	n.mut.Lock()
 	defer  n.mut.Unlock()
 	peerid := strings.Split(d.(serf.Member).Name,"@")[0]
@@ -74,11 +82,17 @@ func (n *Node) leftPeer(d eventual2go.Data){
 	}
 }
 
+func (n *Node) silenceBeacons() {
+	for _,b := range n.beacons {
+		b.Silence()
+	}
+}
+
 func (n *Node) Run()  {
 	for _,agt := range n.agents {
 		agt.Start()
 	}
-	n.createMDNSAgents()
+	n.launchBeacon()
 	return
 }
 
@@ -102,11 +116,10 @@ func (n *Node) createSerfAgent(iface string) {
 
 	serfConfig.NodeName = fmt.Sprintf("%s@%s",n.UUID,iface)
 	serfConfig.LogOutput = n.cfg.Logger()
-	                                               // Set probe intervals that are aggressive for finding bad nodes
-	serfConfig.MemberlistConfig.GossipInterval = 5 * time.Millisecond
-	serfConfig.MemberlistConfig.ProbeInterval = 50 * time.Millisecond
-	serfConfig.MemberlistConfig.ProbeTimeout = 25 * time.Millisecond
-	serfConfig.MemberlistConfig.SuspicionMult = 1
+//	serfConfig.MemberlistConfig.GossipInterval = 5 * time.Millisecond
+//	serfConfig.MemberlistConfig.ProbeInterval = 50 * time.Millisecond
+//	serfConfig.MemberlistConfig.ProbeTimeout = 25 * time.Millisecond
+//	serfConfig.MemberlistConfig.SuspicionMult = 1
 	serfConfig.Init()
 	agentConfig := agent.DefaultConfig()
 
@@ -115,7 +128,35 @@ func (n *Node) createSerfAgent(iface string) {
 	if n.handleErr(err) {
 		agt.RegisterEventHandler(n.eventHandler)
 		n.agents[iface] = agt
+	}
+}
 
+func (n *Node) launchBeacon() {
+	n.logger.Println("Launching Beacon")
+	listening := false
+	for addr,agt := range n.agents {
+		cfg := &beacon.Config{PingAddresses:[]string{addr},Port: 5557, PingInterval:500*time.Millisecond}
+		port := uint16(agt.SerfConfig().MemberlistConfig.BindPort)
+		n.logger.Println("Launching Beacon on",addr,port)
+		payload := NewSignalPayload(port)
+		n.logger.Println("Payload is",payload)
+		b := beacon.New(payload,cfg)
+		if !listening {
+			n.logger.Println("Opening Listen",addr)
+			b.Signals().Where(IsValidSignal).Transform(SignalToAdress).Listen(n.recvPeerSignal)
+			b.Run()
+			listening = true
+		}
+		b.Ping()
+		n.beacons = append(n.beacons,b)
+	}
+}
+
+func (n *Node) recvPeerSignal(d eventual2go.Data) {
+	peeraddress := d.(PeerAddress)
+	n.logger.Printf("Found Peer at %s:%d",peeraddress.IP,peeraddress.Port)
+	for _, agt := range n.agents {
+		agt.Join([]string{fmt.Sprintf("%s:%d",peeraddress.IP,peeraddress.Port)},false)
 	}
 }
 
@@ -127,39 +168,6 @@ func (n *Node) Join() eventual2go.Stream {
 
 func (n *Node) Leave() eventual2go.Stream {
 	return n.eventHandler.leave
-}
-
-
-func (n *Node) createMDNSAgents() {
-	for _, iface := range n.cfg.NetworkInterfaces {
-		n.createMDNSAgent(iface)
-	}
-}
-
-func (n *Node) createMDNSAgent(ifaceAddr string) {
-
-	ifaces,_ := net.Interfaces()
-	index := -1
-	for i, iface := range ifaces {
-		addrs, _ := iface.Addrs()
-		if len(addrs) != 0 {
-			addr := strings.Split(addrs[0].String(),"/")[0]
-			if addr == ifaceAddr {
-				index = i
-				break
-			}
-		}
-	}
-
-	iface:= ifaces[index]
-
-
-	 var err error
-	agt := n.agents[ifaceAddr]
-	n.mDNSAgents[ifaceAddr], err = agent.NewAgentMDNS(agt, n.cfg.Logger(), false, n.UUID, "AurArath",
-		&iface, net.ParseIP(agt.SerfConfig().MemberlistConfig.BindAddr), agt.SerfConfig().MemberlistConfig.BindPort)
-	n.handleErr(err)
-
 }
 
 func (n *Node) QueryPeer(UUID string) {

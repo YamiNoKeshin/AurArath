@@ -79,11 +79,10 @@ func (b *Beacon) setupOutgoing(addr string) {
 
 func (b *Beacon) setupListener() (err error) {
 	var ip net.IP
-	if b.conf.ListenAddress == ""{
-		ip = net.IPv4(224, 0, 0, 251)
-	} else {
-		ip = net.ParseIP(b.conf.ListenAddress)
-	}
+	ip = net.IPv4(224, 0, 0, 251)
+
+	b.logger.Printf("Listen Address is %s",ip)
+
 	b.listenConn, err = net.ListenMulticastUDP("udp4", nil, &net.UDPAddr{
 		IP:   ip,
 		Port: b.conf.Port,
@@ -141,6 +140,9 @@ func (b *Beacon) Silence() {
 	}
 }
 
+func (b *Beacon) Silent() bool{
+	return b.silent
+}
 func (b Beacon) ping(c *net.UDPConn) {
 
 	t := time.NewTimer(b.conf.PingInterval)

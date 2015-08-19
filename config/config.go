@@ -30,7 +30,7 @@ func Default() *Config {
 func DefaultLocalhost() *Config {
 
 	return &Config{
-		NetworkInterfaces: []string{"127.0.0.1"},
+		NetworkInterfaces: []string{"145.108.172.104"},
 
 		//logger: ioutil.Discard,
 		logger: os.Stderr,

@@ -7,7 +7,6 @@ import (
 
 type Config struct {
 
-	ListenAddress string	//Address, Default 224.0.0.251
 	PingAddresses []string
 	//
 	Port int
