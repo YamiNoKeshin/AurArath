@@ -1,8 +1,8 @@
-package aurarath
+package connection
 
 import (
 	"github.com/joernweissenborn/aurarath/config"
-	"github.com/joernweissenborn/aurarath/network/node"
+	"github.com/joernweissenborn/aurarath/network/network.node"
 )
 
 type Import struct {

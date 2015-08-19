@@ -24,7 +24,7 @@ func TestBeacon(t *testing.T) {
 			t.Error("Wrong data, needed 'HALLO', got", data)
 		}
 	case <-time.After(100*time.Millisecond):
-		t.Error("Didnt got beacon 2")
+		t.Error("Didnt got network.beacon 2")
 	}
 
 	select {
@@ -33,7 +33,7 @@ func TestBeacon(t *testing.T) {
 			t.Error("Wrong data, needed '1234', got", data)
 		}
 	case <-time.After(100*time.Millisecond):
-		t.Error("Didn't got beacon 1")
+		t.Error("Didn't got network.beacon 1")
 	}
 
 }

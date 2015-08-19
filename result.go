@@ -1,4 +1,4 @@
-package aurarath
+package connection
 
 type Result struct {
 

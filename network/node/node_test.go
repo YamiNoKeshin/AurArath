@@ -2,7 +2,7 @@ package node_test
 
 import (
 	"github.com/joernweissenborn/aurarath/config"
-	"github.com/joernweissenborn/aurarath/network/node"
+	"github.com/joernweissenborn/aurarath/network/network.node"
 	"time"
 	"testing"
 	"strings"
@@ -22,7 +22,7 @@ func TestNodeDiscover(t *testing.T){
 	t.Log(n1.UUID,n2.UUID)
 	select {
 	case <-time.After(5 * time.Second):
-		t.Fatal("Couldnt find node 1")
+		t.Fatal("Couldnt find network.node 1")
 	case data := <-j1:
 		if !strings.Contains(data.(serf.Member).Name,n2.UUID) {
 			t.Error("Found wrong UUID")
@@ -31,7 +31,7 @@ func TestNodeDiscover(t *testing.T){
 
 	select {
 	case <-time.After(5 * time.Minute):
-		t.Fatal("Couldnt find node 2")
+		t.Fatal("Couldnt find network.node 2")
 	case data := <-j2:
 		if !strings.Contains(data.(serf.Member).Name,n1.UUID) {
 			t.Error("Found wrong UUID")
@@ -53,7 +53,7 @@ func TestNodeLeave(t *testing.T){
 
 	select {
 	case <-time.After(5 * time.Second):
-		t.Fatal("node didnt leave")
+		t.Fatal("network.node didnt leave")
 	case data := <-c:
 		if !strings.Contains(data.(serf.Member).Name,n2.UUID) {
 			t.Error("Found wrong UUID")

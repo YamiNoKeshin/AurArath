@@ -1,4 +1,4 @@
-package aurarath
+package connection
 
 type Request struct {
 	Uuid string

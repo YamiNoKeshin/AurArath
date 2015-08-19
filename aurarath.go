@@ -1,4 +1,4 @@
-package aurarath
+package connection
 
 import "github.com/joernweissenborn/aurarath/config"
 

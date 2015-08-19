@@ -1,10 +1,24 @@
-package aurarath
+package connection
 
-import "github.com/joernweissenborn/aurarath/network/node"
+import (
+	"aurarath/config"
+	"github.com/joernweissenborn/aurarath/network/node"
+)
 
 
 type Export struct {
-	AppKey *AppKey
+	appDescriptor *AppDescriptor
+
 	node   *node.Node
 }
+
+func NewExport(a *AppDescriptor, cfg *config.Config) (e *Export){
+	e = new(Export)
+	e.appDescriptor = a
+	e.node = node.New(cfg,a.AsTagSet())
+	e.node.Queries().Where(IsExporting)
+	return
+}
+
+
 
