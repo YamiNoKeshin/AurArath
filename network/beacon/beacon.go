@@ -6,9 +6,11 @@ import (
 	"net"
 	"time"
 	"log"
+	"sync"
 )
 
 type Beacon struct {
+	m *sync.Mutex
 	conf *Config
 	payload    []byte
 	stop       chan struct {}
@@ -20,7 +22,9 @@ type Beacon struct {
 	logger *log.Logger
 }
 
-func New(payload []byte, conf *Config) (b Beacon) {
+func New(payload []byte, conf *Config) (b *Beacon) {
+	b = new(Beacon)
+	b.m = new(sync.Mutex)
 	b.payload = payload
 	b.conf = conf
 	conf.init()
@@ -46,6 +50,8 @@ func (b *Beacon) Setup() {
 }
 
 func (b *Beacon) Stop() {
+	b.m.Lock()
+	defer b.m.Unlock()
 	b.logger.Println("Stopping")
 	if !b.silent {
 		b.silence.Complete(nil)
@@ -91,11 +97,11 @@ func (b *Beacon) setupListener() (err error) {
 }
 
 
-func (b Beacon) Run() {
+func (b *Beacon) Run() {
 	go b.listen()
 }
 
-func (b Beacon) listen() {
+func (b *Beacon) listen() {
 
 	c := make(chan struct{})
 	go b.getSignal(c)
@@ -111,7 +117,7 @@ func (b Beacon) listen() {
 
 }
 
-func (b Beacon) getSignal(c chan struct{}) {
+func (b *Beacon) getSignal(c chan struct{}) {
 	data := make([]byte, 1024)
 	read, remoteAddr, _ := b.listenConn.ReadFromUDP(data)
 	if !b.in.Closed.IsComplete(){
@@ -120,7 +126,7 @@ func (b Beacon) getSignal(c chan struct{}) {
 	}
 }
 
-func (b Beacon) Signals() eventual2go.Stream {
+func (b *Beacon) Signals() eventual2go.Stream {
 	return b.in.Where(b.noEcho)
 }
 
@@ -134,16 +140,19 @@ func (b *Beacon) Ping() {
 }
 
 func (b *Beacon) Silence() {
+	b.m.Lock()
+	defer b.m.Unlock()
 	if !b.silent {
 		b.silence.Complete(nil)
 		b.silence = eventual2go.NewFuture()
+		b.silent = true
 	}
 }
 
 func (b *Beacon) Silent() bool{
 	return b.silent
 }
-func (b Beacon) ping(c *net.UDPConn) {
+func (b *Beacon) ping(c *net.UDPConn) {
 
 	t := time.NewTimer(b.conf.PingInterval)
 	silence := b.silence.AsChan()
@@ -161,6 +170,6 @@ func (b Beacon) ping(c *net.UDPConn) {
 
 }
 
-func (b Beacon) noEcho(d eventual2go.Data) bool {
+func (b *Beacon) noEcho(d eventual2go.Data) bool {
 	return !bytes.Equal(d.(Signal).Data, b.payload)
 }

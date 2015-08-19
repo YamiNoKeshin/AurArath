@@ -30,7 +30,7 @@ type Node struct {
 
 	eventHandler eventHandler
 
-	beacons []beacon.Beacon
+	beacons []*beacon.Beacon
 
 	knownPeers map[string][]string // A map from peer UUID to IPs
 
@@ -47,7 +47,7 @@ func New(cfg *config.Config, tags map[string]string) (node *Node) {
 	node.UUID = id.String()
 	node.logger = log.New(cfg.Logger(),"Node",log.Lshortfile)
 	node.knownPeers = make(map[string][]string)
-	node.beacons = []beacon.Beacon{}
+	node.beacons = []*beacon.Beacon{}
 	node.mut = new(sync.RWMutex)
 	node.eventHandler = newEventHandler()
 	node.eventHandler.join.Listen(node.newPeer)
@@ -122,7 +122,7 @@ func (n *Node) createSerfAgent(iface string) {
 //	serfConfig.MemberlistConfig.SuspicionMult = 1
 	serfConfig.Init()
 	agentConfig := agent.DefaultConfig()
-
+	agentConfig.Tags = n.tags
 	agt, err := agent.Create(agentConfig, serfConfig, n.cfg.Logger())
 
 	if n.handleErr(err) {
@@ -170,11 +170,32 @@ func (n *Node) Leave() eventual2go.Stream {
 	return n.eventHandler.leave
 }
 
-func (n *Node) QueryPeer(UUID string) {
-
-
-
+func (n *Node) Queries() eventual2go.Stream {
+	return n.eventHandler.query
 }
+
+func (n *Node) Query(name string, data []byte, results eventual2go.StreamController) {
+	wg := new(sync.WaitGroup)
+	for _, agt := range n.agents {
+		params := &serf.QueryParam{FilterTags:n.tags}
+		resp, _ := agt.Query(name, data, params)
+		wg.Add(1)
+		go collectResponse(resp,results, wg)
+	}
+	go waitForQueryFinish(results,wg)
+}
+
+func collectResponse(resp *serf.QueryResponse, s eventual2go.StreamController, wg *sync.WaitGroup){
+	for r := range resp.ResponseCh() {
+		s.Add(r)
+	}
+	wg.Done()
+}
+func waitForQueryFinish(s eventual2go.StreamController, wg *sync.WaitGroup) {
+	wg.Wait()
+	s.Close()
+}
+
 func (n *Node) Shutdown() {
 	for _, agt := range n.agents{
 		agt.Leave()
