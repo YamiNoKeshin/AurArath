@@ -16,14 +16,14 @@ type Function struct {
 	Output []Parameter
 }
 
-func (f Function) String(){
+func (f Function) String()string{
 	inpar := ""
 	for _,p := range f.Input {
-		inpar = fmt.Sprintf("%s,%s",inpar)
+		inpar = fmt.Sprintf("%s,%s",inpar,p)
 	}
 	outpar := ""
 	for _,p := range f.Output{
-		outpar = fmt.Sprintf("%s,%s",outpar)
+		outpar = fmt.Sprintf("%s,%s",outpar,p)
 	}
 	return fmt.Sprintf("%s(%s)%s",f.Name,inpar,outpar)
 }
@@ -35,7 +35,7 @@ type Parameter struct {
 
 //name(par:type,...)par:type
 
-func (p Parameter) String(){
+func (p Parameter) String()string {
 	return fmt.Sprintf("%s:%s",p.Name,p.Type)
 }
 

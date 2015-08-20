@@ -1,24 +1,20 @@
 package connection
 
 import (
-	"aurarath/config"
-	"github.com/joernweissenborn/aurarath/network/node"
+	"github.com/joernweissenborn/aurarath/config"
 )
 
 
 type Export struct {
-	appDescriptor *AppDescriptor
-
-	node   *node.Node
+	*Service
 }
 
 func NewExport(a *AppDescriptor, cfg *config.Config) (e *Export){
 	e = new(Export)
-	e.appDescriptor = a
-	e.node = node.New(cfg,a.AsTagSet())
-	e.node.Queries().Where(IsExporting)
+	e.Service = NewService(a, EXPORTING, cfg,[]byte{0})
 	return
 }
+
 
 
 

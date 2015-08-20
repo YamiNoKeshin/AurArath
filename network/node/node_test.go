@@ -2,7 +2,7 @@ package node_test
 
 import (
 	"github.com/joernweissenborn/aurarath/config"
-	"github.com/joernweissenborn/aurarath/network/network.node"
+	"github.com/joernweissenborn/aurarath/network/node"
 	"time"
 	"testing"
 	"strings"

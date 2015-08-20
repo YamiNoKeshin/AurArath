@@ -26,66 +26,49 @@ type Node struct {
 	tags map[string]string
 
 	agents     map[string]*agent.Agent
-	mDNSAgents map[string] *agent.AgentMDNS
-
-	eventHandler eventHandler
 
 	beacons []*beacon.Beacon
 
-	knownPeers map[string][]string // A map from peer UUID to IPs
-
 	logger *log.Logger
+
+	join eventual2go.StreamController
+	leave eventual2go.StreamController
+	query eventual2go.StreamController
 }
 
 func New(cfg *config.Config, tags map[string]string) (node *Node) {
+
 	node = new(Node)
+	node.logger = log.New(cfg.Logger(),"Node",log.Lshortfile)
+
+	node.logger.Println("Initializing")
 
 	node.cfg = cfg
 	node.tags = tags
 
 	id, _ := uuid.NewV4()
 	node.UUID = id.String()
-	node.logger = log.New(cfg.Logger(),"Node",log.Lshortfile)
-	node.knownPeers = make(map[string][]string)
 	node.beacons = []*beacon.Beacon{}
 	node.mut = new(sync.RWMutex)
-	node.eventHandler = newEventHandler()
-	node.eventHandler.join.Listen(node.newPeer)
-	node.eventHandler.leave.Listen(node.leftPeer)
+	node.logger.Println("Launching Serf Agents")
+
+	node.join = eventual2go.NewStreamController()
+	node.join.First().Then(node.silenceBeacons)
+	node.leave = eventual2go.NewStreamController()
+	node.query = eventual2go.NewStreamController()
 
 	node.createSerfAgents()
-
 
 
 	return node
 }
 
-func (n *Node) newPeer(d eventual2go.Data){
-	n.silenceBeacons()
-	n.mut.Lock()
-	defer  n.mut.Unlock()
-	peerid := strings.Split(d.(serf.Member).Name,"@")[0]
-	peerip :=d.(serf.Member).Addr.String()
-	n.knownPeers[peerid] = append(n.knownPeers[peerid],peerip)
-}
-func (n *Node) leftPeer(d eventual2go.Data){
-	n.mut.Lock()
-	defer  n.mut.Unlock()
-	peerid := strings.Split(d.(serf.Member).Name,"@")[0]
-	peerip :=d.(serf.Member).Addr.String()
-	old := n.knownPeers[peerid]
-	n.knownPeers[peerid] = []string{}
-	for _, ip := range old {
-		if ip != peerip {
-			n.knownPeers[peerid] = append(n.knownPeers[peerid],ip)
-		}
-	}
-}
 
-func (n *Node) silenceBeacons() {
+func (n *Node) silenceBeacons(eventual2go.Data) eventual2go.Data{
 	for _,b := range n.beacons {
 		b.Silence()
 	}
+	return nil
 }
 
 func (n *Node) Run()  {
@@ -99,12 +82,12 @@ func (n *Node) Run()  {
 func (n *Node) createSerfAgents() {
 	n.agents = make(map[string]*agent.Agent)
 	for _, iface := range n.cfg.NetworkInterfaces {
+		n.logger.Println("Launching Agent on",iface)
+
 		n.createSerfAgent(iface)
 	}
 }
 func (n *Node) createSerfAgent(iface string) {
-
-	n.mDNSAgents= make(map[string]*agent.AgentMDNS)
 
 	serfConfig := serf.DefaultConfig()
 
@@ -123,14 +106,25 @@ func (n *Node) createSerfAgent(iface string) {
 	serfConfig.Init()
 	agentConfig := agent.DefaultConfig()
 	agentConfig.Tags = n.tags
+	agentConfig.LogLevel = "info"
 	agt, err := agent.Create(agentConfig, serfConfig, n.cfg.Logger())
 
 	if n.handleErr(err) {
-		agt.RegisterEventHandler(n.eventHandler)
+		eventHandler := newEventHandler()
+		eventHandler.join.WhereNot(n.isSelf).Listen(func(d eventual2go.Data){n.join.Add(d)})
+		eventHandler.leave.Listen(func(d eventual2go.Data){n.leave.Add(d)})
+		eventHandler.query.Transform(toQueryEvent(iface)).Listen(func(d eventual2go.Data){n.query.Add(d)})
+		agt.RegisterEventHandler(eventHandler)
 		n.agents[iface] = agt
+		n.logger.Println("Agent Created")
+	} else {
+		n.logger.Println("Failed to create Agent")
 	}
 }
 
+func (n *Node) isSelf(d eventual2go.Data)bool{
+	return strings.Contains(d.(serf.Member).Name,n.UUID)
+}
 func (n *Node) launchBeacon() {
 	n.logger.Println("Launching Beacon")
 	listening := false
@@ -161,33 +155,31 @@ func (n *Node) recvPeerSignal(d eventual2go.Data) {
 }
 
 func (n *Node) Join() eventual2go.Stream {
-	return n.eventHandler.join.WhereNot(func(d eventual2go.Data)bool{
-		return strings.Contains(d.(serf.Member).Name,n.UUID)
-	})
+	return n.join.Stream
 }
 
 func (n *Node) Leave() eventual2go.Stream {
-	return n.eventHandler.leave
+	return n.leave.Stream
 }
 
 func (n *Node) Queries() eventual2go.Stream {
-	return n.eventHandler.query
+	return n.query.Stream
 }
 
 func (n *Node) Query(name string, data []byte, results eventual2go.StreamController) {
 	wg := new(sync.WaitGroup)
-	for _, agt := range n.agents {
+	for iface, agt := range n.agents {
 		params := &serf.QueryParam{FilterTags:n.tags}
 		resp, _ := agt.Query(name, data, params)
 		wg.Add(1)
-		go collectResponse(resp,results, wg)
+		go collectResponse(iface, resp, results, wg)
 	}
 	go waitForQueryFinish(results,wg)
 }
 
-func collectResponse(resp *serf.QueryResponse, s eventual2go.StreamController, wg *sync.WaitGroup){
+func collectResponse(iface string,resp *serf.QueryResponse, s eventual2go.StreamController, wg *sync.WaitGroup){
 	for r := range resp.ResponseCh() {
-		s.Add(r)
+		s.Add(QueryResponseEvent{iface,r})
 	}
 	wg.Done()
 }

@@ -1,18 +1,16 @@
 package connection
 import (
 	"github.com/joernweissenborn/eventual2go"
-	"github.com/hashicorp/serf/serf"
+	"github.com/joernweissenborn/aurarath/network/node"
 )
 
 const (
-	EXPORTING = "EXPORTING"
-	IMPORTING = "IMPORTING"
+	EXPORTING = "EXPORT"
+	IMPORTING = "IMPORT"
 )
 
-func IsExporting(d eventual2go.Data) bool {
-	return d.(*serf.Query).Name == EXPORTING
-}
-
-func IsImporting(d eventual2go.Data) bool {
-	return d.(*serf.Query).Name == IMPORTING
+func isService(servicetype string)eventual2go.Filter{
+	return func(d eventual2go.Data) bool {
+		return d.(node.QueryEvent).Query.Name == servicetype
+	}
 }

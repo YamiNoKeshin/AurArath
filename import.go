@@ -1,22 +1,20 @@
 package connection
 
 import (
-	"github.com/joernweissenborn/aurarath/config"
-	"github.com/joernweissenborn/aurarath/network/network.node"
+	"github.com/joernweissenborn/aurarath/network/node"
 )
 
 type Import struct {
-	AppKey *AppKey
 	node  *node.Node
 }
 
-func NewImport(config *config.Config, key *AppKey) *Import {
-	imp := Import{
-		AppKey: key,
-	}
-
-	return &imp
-}
+//func NewImport(config *config.Config, key *AppKey) *Import {
+//	imp := Import{
+//		AppKey: key,
+//	}
+//
+//	return &imp
+//}
 
 func (*Import) AddFunction(fkt *Function)  {
 }
