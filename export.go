@@ -15,6 +15,3 @@ func NewExport(a *AppDescriptor, cfg *config.Config) (e *Export){
 	return
 }
 
-
-
-

@@ -2,19 +2,20 @@ package aurarath
 
 import (
 	"github.com/joernweissenborn/aurarath/network/node"
+	"github.com/joernweissenborn/aurarath/config"
 )
 
 type Import struct {
-	node  *node.Node
+	*Service
 }
 
-//func NewImport(config *config.Config, key *AppKey) *Import {
-//	imp := Import{
-//		AppKey: key,
-//	}
-//
-//	return &imp
-//}
+func NewImport(a *AppDescriptor, cfg *config.Config) (e *Export){
+	e = new(Export)
+	e.Service = NewService(a, IMPORTING, cfg,[]byte{0})
+	return
+}
+
+
 
 func (*Import) AddFunction(fkt *Function)  {
 }

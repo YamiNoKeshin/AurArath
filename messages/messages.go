@@ -13,6 +13,8 @@ type MessageType int
 const (
 	HELLO MessageType = iota
 	HELLO_OK
+	REQUEST
+	RESULT
 )
 
 func Get(messagetype MessageType) (msg Message){
@@ -22,6 +24,10 @@ func Get(messagetype MessageType) (msg Message){
 		msg =new(Hello)
 	case HELLO_OK:
 		msg =new(HelloOk)
+	case REQUEST:
+		msg=new(Request)
+	case RESULT\:
+		msg=new(Result)
 	}
 	return
 }
@@ -29,6 +35,8 @@ func Get(messagetype MessageType) (msg Message){
 func init(){
 	gob.Register(Hello{})
 	gob.Register(HelloOk{})
+	gob.Register(Request{})
+	gob.Register(Result{})
 }
 
 func Is(t MessageType) eventual2go.Filter {
