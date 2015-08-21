@@ -14,6 +14,7 @@ import (
 	"github.com/joernweissenborn/aurarath/network/beacon"
 	"time"
 	"log"
+	"io/ioutil"
 )
 
 type Node struct {
@@ -39,7 +40,7 @@ type Node struct {
 func New(cfg *config.Config, tags map[string]string) (node *Node) {
 
 	node = new(Node)
-	node.logger = log.New(cfg.Logger(),"Node",log.Lshortfile)
+	node.logger = log.New(cfg.Logger(),"Node ",log.Lshortfile)
 
 	node.logger.Println("Initializing")
 
@@ -98,7 +99,8 @@ func (n *Node) createSerfAgent(iface string) {
 	serfConfig.MemberlistConfig.BindPort = getRandomPort(iface)
 
 	serfConfig.NodeName = fmt.Sprintf("%s@%s",n.UUID,iface)
-	serfConfig.LogOutput = n.cfg.Logger()
+//	serfConfig.LogOutput = n.cfg.Logger()
+	serfConfig.LogOutput = ioutil.Discard
 //	serfConfig.MemberlistConfig.GossipInterval = 5 * time.Millisecond
 //	serfConfig.MemberlistConfig.ProbeInterval = 50 * time.Millisecond
 //	serfConfig.MemberlistConfig.ProbeTimeout = 25 * time.Millisecond
@@ -106,13 +108,14 @@ func (n *Node) createSerfAgent(iface string) {
 	serfConfig.Init()
 	agentConfig := agent.DefaultConfig()
 	agentConfig.Tags = n.tags
-	agentConfig.LogLevel = "info"
-	agt, err := agent.Create(agentConfig, serfConfig, n.cfg.Logger())
+	agentConfig.LogLevel = "INFO"
+	agt, err := agent.Create(agentConfig, serfConfig, ioutil.Discard)
+//	agt, err := agent.Create(agentConfig, serfConfig, n.cfg.Logger())
 
 	if n.handleErr(err) {
 		eventHandler := newEventHandler()
 		eventHandler.join.WhereNot(n.isSelf).Listen(func(d eventual2go.Data){n.join.Add(d)})
-		eventHandler.leave.Listen(func(d eventual2go.Data){n.leave.Add(d)})
+		n.leave.Join(eventHandler.leave)
 		eventHandler.query.Transform(toQueryEvent(iface)).Listen(func(d eventual2go.Data){n.query.Add(d)})
 		agt.RegisterEventHandler(eventHandler)
 		n.agents[iface] = agt
@@ -159,7 +162,7 @@ func (n *Node) Join() eventual2go.Stream {
 }
 
 func (n *Node) Leave() eventual2go.Stream {
-	return n.leave.Stream
+	return n.leave.Transform(toLeaveEvent())
 }
 
 func (n *Node) Queries() eventual2go.Stream {

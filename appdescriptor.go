@@ -1,4 +1,4 @@
-package connection
+package aurarath
 
 import (
 	"encoding/json"

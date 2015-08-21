@@ -118,10 +118,12 @@ func (b *Beacon) listen() {
 }
 
 func (b *Beacon) getSignal(c chan struct{}) {
+	b.m.Lock()
+	defer b.m.Unlock()
 	data := make([]byte, 1024)
 	read, remoteAddr, _ := b.listenConn.ReadFromUDP(data)
 	if !b.in.Closed.IsComplete(){
-	b.in.Add(Signal{remoteAddr.IP[len(remoteAddr.IP)-4:], data[:read]})
+		b.in.Add(Signal{remoteAddr.IP[len(remoteAddr.IP)-4:], data[:read]})
 		c <- struct{}{}
 	}
 }

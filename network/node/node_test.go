@@ -55,7 +55,7 @@ func TestNodeLeave(t *testing.T){
 	case <-time.After(5 * time.Second):
 		t.Fatal("network.node didnt leave")
 	case data := <-c:
-		if !strings.Contains(data.(serf.Member).Name,n2.UUID) {
+		if !strings.Contains(data.(node.LeaveEvent).Name,n2.UUID) {
 			t.Error("Found wrong UUID")
 		}
 	}

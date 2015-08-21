@@ -1,21 +1,45 @@
 package messages
 import (
-	"encoding/gob"
-	"encoding/binary"
-	"bytes"
+	"github.com/joernweissenborn/eventual2go"
+	"github.com/joernweissenborn/aurarath/network"
+	"strconv"
+	"github.com/joernweissenborn/aurarath/network/connection"
 )
 
 
 
 type Message interface {
-	GetType() uint16
+	GetType() MessageType
+	Flatten() [][]byte
+	Unflatten([]string)
 }
 
 func Flatten(m Message) [][]byte {
-	t := make([]byte,2)
-	binary.LittleEndian.PutUint16(t,m.GetType())
-	var payload bytes.Buffer
-	enc := gob.NewEncoder(&payload)
-	enc.Encode(m)
-	return [][]byte{t,payload.Bytes()}
+	t := strconv.FormatInt(int64(m.GetType()),10)
+	payload := [][]byte{[]byte{byte(network.PROTOCOL_SIGNATURE)},[]byte(t)}
+	for _,p := range m.Flatten() {
+		payload = append(payload,p)
+	}
+	return payload
+}
+
+func Unflatten(m []string) (msg Message){
+	mtype, _ := strconv.ParseInt(m[0],10,8)
+	msg = Get(MessageType(mtype))
+	msg.Unflatten(m[1:])
+	return
+}
+
+func Valid(d eventual2go.Data) bool {
+	m := d.(connection.Message).Payload
+	if len(m)<3 {
+		return false
+	}
+	p := []byte(m[1])[0]
+
+
+	if p != network.PROTOCOL_SIGNATURE{
+		return false
+	}
+	return true
 }

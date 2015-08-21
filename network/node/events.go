@@ -25,3 +25,13 @@ func toQueryResponseEvent(iface string) eventual2go.Transformer {
 		return QueryResponseEvent{iface, d.(serf.NodeResponse)}
 	}
 }
+
+type LeaveEvent struct {
+	Name string
+}
+
+func toLeaveEvent() eventual2go.Transformer {
+	return func(d eventual2go.Data) eventual2go.Data {
+		return LeaveEvent{d.(serf.Member).Name}
+	}
+}
