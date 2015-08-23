@@ -15,6 +15,8 @@ const (
 	HELLO_OK
 	REQUEST
 	RESULT
+	LISTEN
+	STOP_LISTEN
 )
 
 func Get(messagetype MessageType) (msg Message){
@@ -28,6 +30,10 @@ func Get(messagetype MessageType) (msg Message){
 		msg=new(Request)
 	case RESULT:
 		msg=new(Result)
+	case LISTEN:
+		msg=new(Listen)
+	case STOP_LISTEN:
+		msg=new(StopListen)
 	}
 	return
 }
@@ -40,5 +46,6 @@ func init(){
 }
 
 func Is(t MessageType) eventual2go.Filter {
-	return func(d eventual2go.Data) bool {return d.(IncomingMessage).Msg.GetType() == t}
+	return func(d eventual2go.Data) bool {
+		return d.(IncomingMessage).Msg.GetType() == t}
 }

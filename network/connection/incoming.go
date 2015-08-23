@@ -67,6 +67,7 @@ func (i *Incoming) listen() {
 		i.m.Lock()
 		if i.stopped {
 			i.m.Unlock()
+
 			return
 		}
 		sockets, err := poller.Poll(100*time.Millisecond)
@@ -77,7 +78,6 @@ func (i *Incoming) listen() {
 
 			msg, err := i.skt.RecvMessage(0)
 			if err == nil {
-				fmt.Println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>3",msg)
 				i.in.Add(Message{i.addr, msg})
 			}
 		}

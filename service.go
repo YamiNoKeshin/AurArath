@@ -10,10 +10,15 @@ import (
 	"log"
 	"github.com/joernweissenborn/aurarath/network/peer"
 	"github.com/joernweissenborn/aurarath/messages"
+	"sync"
+	"fmt"
 )
 
 
 type Service struct {
+
+	m *sync.RWMutex
+
 	appDescriptor *AppDescriptor
 
 	node   *node.Node
@@ -34,14 +39,19 @@ type Service struct {
 
 	connected *eventual2go.Future
 	disconnected *eventual2go.Future
+
+	newpeers eventual2go.StreamController
+	gonepeers eventual2go.StreamController
 }
 
 func NewService(a *AppDescriptor, servicetype string, cfg *config.Config, codecs []byte) (s *Service){
 	s = new(Service)
-	s.logger = log.New(cfg.Logger(),"Service ",log.Lshortfile)
+	s.m = new(sync.RWMutex)
 	s.appDescriptor = a
 	s.servicetype = servicetype
 	s.codecs = codecs
+	s.newpeers = eventual2go.NewStreamController()
+	s.gonepeers = eventual2go.NewStreamController()
 	s.incoming = map[string]*connection.Incoming{}
 	s.in = eventual2go.NewStreamController()
 	s.in.Where(messages.Is(messages.HELLO)).Listen(s.peerGreeted)
@@ -51,6 +61,7 @@ func NewService(a *AppDescriptor, servicetype string, cfg *config.Config, codecs
 	s.disconnected = eventual2go.NewFuture()
 	s.remove = eventual2go.NewFuture()
 	s.node = node.New(cfg,a.AsTagSet())
+	s.logger = log.New(cfg.Logger(),fmt.Sprintf("Service %s ",s.UUID()),log.Lshortfile)
 	s.node.Queries().WhereNot(isService(servicetype)).Listen(s.replyToService)
 	s.node.Join().First().Then(s.announce)
 	s.node.Leave().Listen(s.peerLeave)
@@ -94,6 +105,8 @@ func (s *Service) announce(eventual2go.Data) eventual2go.Data{
 }
 
 func (s *Service) peerLeft(d eventual2go.Data) {
+	s.m.Lock()
+	defer  s.m.Unlock()
 	r := d.(node.QueryResponseEvent)
 	buf := strings.Split(r.Response.From, "@")
 	if len(buf) != 2 {
@@ -109,6 +122,7 @@ func (s *Service) peerLeft(d eventual2go.Data) {
 
 func (s *Service) peerLeave(d eventual2go.Data) {
 	r := d.(node.LeaveEvent)
+	s.logger.Println("Peerleave",d)
 	buf := strings.Split(r.Name, "@")
 	if len(buf) != 2 {
 		return
@@ -120,20 +134,27 @@ func (s *Service) peerLeave(d eventual2go.Data) {
 func (s *Service) createPeer(uuid string) (p *peer.Peer) {
 	p = peer.New(uuid)
 	p.Disconnected().Then(s.removePeer)
+	s.newpeers.JoinFuture(p.Greeted())
 	s.peers[uuid] = p
 	return
 }
 func (s *Service) removePeer(d eventual2go.Data) (eventual2go.Data) {
+	s.m.Lock()
+	defer  s.m.Unlock()
 	uuid := d.(string)
 	s.logger.Println("Removing peer",uuid)
 	delete(s.peers,uuid)
-	if len(s.peers) == 0 {
+	s.gonepeers.Add(uuid)
+	if len(s.peers) == 0 && !s.disconnected.IsComplete() {
 		s.logger.Println("Disconnected")
 		s.disconnected.Complete(nil)
 	}
 	return nil
 }
+
 func (s *Service) foundPeer(d eventual2go.Data) {
+	s.m.Lock()
+	defer  s.m.Unlock()
 	r := d.(node.QueryResponseEvent)
 	buf := strings.Split(r.Response.From, "@")
 	if len(buf) != 2 {
@@ -153,6 +174,8 @@ func (s *Service) foundPeer(d eventual2go.Data) {
 	}
 
 	p.OpenConnection(ip, port,s.UUID())
+	s.logger.Println("DONE")
+
 }
 
 
@@ -176,6 +199,8 @@ func (s *Service) greetPeerBack() eventual2go.CompletionHandler {
 }
 
 func (s *Service) peerGreeted(d eventual2go.Data) {
+	s.m.Lock()
+	defer  s.m.Unlock()
 	m := d.(messages.IncomingMessage)
 	h := m.Msg.(*messages.Hello)
 	s.logger.Println("Got greeting from ",m.Sender)
@@ -183,10 +208,10 @@ func (s *Service) peerGreeted(d eventual2go.Data) {
 	if p == nil {
 		s.logger.Println("Peer does not exist, creating",m.Sender)
 		p = s.createPeer(m.Sender)
-		p.Connected().Then(s.greetPeerBack())
+		p.OpenConnection(h.Address, uint16(h.Port),s.UUID())
 	}
+	p.Connected().Then(s.greetPeerBack())
 	p.SetDetails(h.PeerDetails)
-	p.OpenConnection(h.Address, uint16(h.Port),s.UUID())
 
 	if !s.connected.IsComplete() {
 		s.logger.Println("Connected")
@@ -195,8 +220,11 @@ func (s *Service) peerGreeted(d eventual2go.Data) {
 }
 
 func (s *Service) peerGreetedBack(d eventual2go.Data) {
+	s.m.Lock()
+	defer  s.m.Unlock()
 	m := d.(messages.IncomingMessage)
 	h := m.Msg.(*messages.HelloOk)
+	s.logger.Println("Peer greeted back",m.Sender)
 	p := s.peers[m.Sender]
 	p.SetDetails(h.PeerDetails)
 	if !s.connected.IsComplete() {
@@ -213,6 +241,8 @@ func (s *Service) getDetails() peer.Details{
 }
 
 func (s *Service) getConnectedPeers() (peers []*peer.Peer){
+	s.m.RLock()
+	defer  s.m.RUnlock()
 	peers = []*peer.Peer{}
 	for _,p := range s.peers{
 		if p.Connected().IsComplete() && p.Greeted().IsComplete() {
@@ -241,8 +271,10 @@ func (s *Service) Remove() {
 	}
 	for _, p := range s.peers {
 		p.CloseAllConnections()
-		s.remove.Complete(nil)
 	}
+
+	s.remove.Complete(nil)
+	s.logger.Println("Service Stopped",s.UUID())
 }
 
 

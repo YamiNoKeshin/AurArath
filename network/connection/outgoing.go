@@ -47,7 +47,11 @@ func (o Outgoing) send(d eventual2go.Data) {
 	o.Lock()
 	defer o.Unlock()
 
-	o.skt.SendMessage(d)
+	_, err := o.skt.SendMessage(d)
+
+	if err != nil {
+		panic(err)
+	}
 
 	return
 }

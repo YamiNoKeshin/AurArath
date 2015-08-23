@@ -84,7 +84,9 @@ func (p *Peer) Details()(d Details) {
 
 func (p *Peer) SetDetails(d Details) {
 	p.details = d
-	p.greeted.Complete(nil)
+	if !p.greeted.IsComplete(){
+		p.greeted.Complete(p)
+	}
 }
 
 func (p *Peer) Greeted()(*eventual2go.Future) {

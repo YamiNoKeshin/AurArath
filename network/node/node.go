@@ -115,7 +115,7 @@ func (n *Node) createSerfAgent(iface string) {
 	if n.handleErr(err) {
 		eventHandler := newEventHandler()
 		n.join.Join(eventHandler.join.WhereNot(n.isSelf))
-		n.leave.Join(eventHandler.leave.WhereNot(n.isSelf))
+		n.leave.Join(eventHandler.leave.WhereNot(n.isSelf).Transform(toLeaveEvent()))
 		n.query.Join(eventHandler.query.Transform(toQueryEvent(iface)))
 		agt.RegisterEventHandler(eventHandler)
 		n.agents[iface] = agt
@@ -151,7 +151,7 @@ func (n *Node) launchBeacon() {
 
 func (n *Node) recvPeerSignal(d eventual2go.Data) {
 	peeraddress := d.(PeerAddress)
-	n.logger.Printf("Found Peer at %s:%d",peeraddress.IP,peeraddress.Port)
+//	n.logger.Printf("Found Peer at %s:%d",peeraddress.IP,peeraddress.Port)
 	for _, agt := range n.agents {
 		agt.Join([]string{fmt.Sprintf("%s:%d",peeraddress.IP,peeraddress.Port)},false)
 	}
@@ -162,7 +162,7 @@ func (n *Node) Join() eventual2go.Stream {
 }
 
 func (n *Node) Leave() eventual2go.Stream {
-	return n.leave.Transform(toLeaveEvent())
+	return n.leave.Stream
 }
 
 func (n *Node) Queries() eventual2go.Stream {
