@@ -43,3 +43,8 @@ func(r *Request) Flatten() [][]byte {
 	return [][]byte{payload.Bytes(),r.params}
 }
 
+func(r *Request) Parameter() []byte {
+	return r.params
+}
+
+

@@ -204,8 +204,22 @@ func (s *Service) peerGreetedBack(d eventual2go.Data) {
 	}
 }
 
+func (s *Service) getPeer(uuid string) (p *peer.Peer){
+	return s.peers[uuid]
+}
+
 func (s *Service) getDetails() peer.Details{
 	return peer.Details{s.codecs}
+}
+
+func (s *Service) getConnectedPeers() (peers []*peer.Peer){
+	peers = []*peer.Peer{}
+	for _,p := range s.peers{
+		if p.Connected().IsComplete() && p.Greeted().IsComplete() {
+			peers = append(peers,p)
+		}
+	}
+	return
 }
 
 func (s *Service) replyToService(d eventual2go.Data){

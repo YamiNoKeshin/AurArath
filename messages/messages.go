@@ -26,7 +26,7 @@ func Get(messagetype MessageType) (msg Message){
 		msg =new(HelloOk)
 	case REQUEST:
 		msg=new(Request)
-	case RESULT\:
+	case RESULT:
 		msg=new(Result)
 	}
 	return

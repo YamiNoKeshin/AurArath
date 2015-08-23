@@ -114,9 +114,9 @@ func (n *Node) createSerfAgent(iface string) {
 
 	if n.handleErr(err) {
 		eventHandler := newEventHandler()
-		eventHandler.join.WhereNot(n.isSelf).Listen(func(d eventual2go.Data){n.join.Add(d)})
-		n.leave.Join(eventHandler.leave)
-		eventHandler.query.Transform(toQueryEvent(iface)).Listen(func(d eventual2go.Data){n.query.Add(d)})
+		n.join.Join(eventHandler.join.WhereNot(n.isSelf))
+		n.leave.Join(eventHandler.leave.WhereNot(n.isSelf))
+		n.query.Join(eventHandler.query.Transform(toQueryEvent(iface)))
 		agt.RegisterEventHandler(eventHandler)
 		n.agents[iface] = agt
 		n.logger.Println("Agent Created")
