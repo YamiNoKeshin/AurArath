@@ -1,4 +1,4 @@
-package aurarath
+package service
 
 import (
 	"github.com/joernweissenborn/aurarath/network/node"
@@ -12,16 +12,19 @@ import (
 	"github.com/joernweissenborn/aurarath/messages"
 	"sync"
 	"fmt"
+	"github.com/joernweissenborn/aurarath/appdescriptor"
 )
 
 
 type Service struct {
 
-	m *sync.RWMutex
+	uuid string
 
-	appDescriptor *AppDescriptor
+	r *eventual2go.Reactor
 
-	node   *node.Node
+	appDescriptor *appdescriptor.AppDescriptor
+
+	announcer *Announcer
 
 	remove *eventual2go.Future
 
@@ -44,33 +47,36 @@ type Service struct {
 	gonepeers eventual2go.StreamController
 }
 
-func NewService(a *AppDescriptor, servicetype string, cfg *config.Config, codecs []byte) (s *Service){
+func NewService(a *appdescriptor.AppDescriptor, servicetype string, cfg *config.Config, codecs []byte) (s *Service){
 	s = new(Service)
-	s.m = new(sync.RWMutex)
 	s.appDescriptor = a
 	s.servicetype = servicetype
 	s.codecs = codecs
 	s.newpeers = eventual2go.NewStreamController()
 	s.gonepeers = eventual2go.NewStreamController()
+
 	s.incoming = map[string]*connection.Incoming{}
 	s.in = eventual2go.NewStreamController()
-	s.in.Where(messages.Is(messages.HELLO)).Listen(s.peerGreeted)
-	s.in.Where(messages.Is(messages.HELLO_OK)).Listen(s.peerGreetedBack)
+
 	s.peers = map[string]*peer.Peer{}
 	s.connected = eventual2go.NewFuture()
 	s.disconnected = eventual2go.NewFuture()
 	s.remove = eventual2go.NewFuture()
-	s.node = node.New(cfg,a.AsTagSet())
-	s.logger = log.New(cfg.Logger(),fmt.Sprintf("Service %s ",s.UUID()),log.Lshortfile)
-	s.node.Queries().WhereNot(isService(servicetype)).Listen(s.replyToService)
-	s.node.Join().First().Then(s.announce)
-	s.node.Leave().Listen(s.peerLeave)
+
+	s.r = eventual2go.NewReactor()
+	s.r.React("service_arrived",s.serviceArrived)
+	s.r.React("service_gone",s.serviceGone)
+	s.r.React("service_greeted",s.serviceGreeted)
+	s.r.AddStream(s.in.Where(messages.Is(messages.HELLO)))
+	s.r.React("service_greeted_back",s.serviceGreetedBack)
+	s.r.AddStream(s.in.Where(messages.Is(messages.HELLO_OK)))
 	s.createIncoming(cfg)
+	s.createAnnouncer()
 	return
 }
 
 func (s *Service) UUID() string{
-	return s.node.UUID
+	return s.uuid
 }
 
 func (s *Service) Connected() *eventual2go.Future{
@@ -82,8 +88,9 @@ func (s *Service) Disconnected() *eventual2go.Future{
 }
 
 func (s *Service) Run() {
-	s.node.Run()
+	s.announcer.Run()
 }
+
 func (s *Service) createIncoming(cfg *config.Config) {
 	for _, addr := range cfg.NetworkInterfaces {
 		s.logger.Println("Opening Incoming Socket on", addr)
@@ -97,14 +104,26 @@ func (s *Service) createIncoming(cfg *config.Config) {
 	}
 }
 
-func (s *Service) announce(eventual2go.Data) eventual2go.Data{
-	results := eventual2go.NewStreamController()
-	results.Listen(s.foundPeer)
-	s.node.Query(s.servicetype,nil,results)
-	return nil
+func (s *Service) createAnnouncer() {
+	addrs := []string{}
+
+	for addr,i := range s.incoming {
+		addrs = append(addrs,fmt.Sprintf("%s:%d",addr,i.Port()))
+	}
+
+	s.announcer = NewAnnouncer(s.uuid,addrs,s.servicetype,s.appDescriptor)
+	s.r.AddStream("service_arrived",s.announcer.ServiceArrived())
+	s.r.AddStream("service_gone",s.announcer.ServiceGone())
 }
 
-func (s *Service) peerLeft(d eventual2go.Data) {
+func (s *Service) serviceArrived(d eventual2go.Data) {
+	sa := d.(ServiceArrived)
+	if !s.peerExist(sa.UUID) {
+		s.c
+	}
+}
+
+func (s *Service) serviceGone(d eventual2go.Data) {
 	s.m.Lock()
 	defer  s.m.Unlock()
 	r := d.(node.QueryResponseEvent)
@@ -152,7 +171,7 @@ func (s *Service) removePeer(d eventual2go.Data) (eventual2go.Data) {
 	return nil
 }
 
-func (s *Service) foundPeer(d eventual2go.Data) {
+func (s *Service) newPeer() {
 	s.m.Lock()
 	defer  s.m.Unlock()
 	r := d.(node.QueryResponseEvent)
@@ -232,6 +251,10 @@ func (s *Service) peerGreetedBack(d eventual2go.Data) {
 	}
 }
 
+func (s *Service) peerExist(uuid string) (e bool){
+	_,e = s.peers[uuid]
+	return
+}
 func (s *Service) getPeer(uuid string) (p *peer.Peer){
 	return s.peers[uuid]
 }

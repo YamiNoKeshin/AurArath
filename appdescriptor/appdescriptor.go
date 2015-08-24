@@ -1,4 +1,4 @@
-package aurarath
+package appdescriptor
 
 import (
 	"encoding/json"

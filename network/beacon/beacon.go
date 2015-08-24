@@ -29,7 +29,7 @@ func New(payload []byte, conf *Config) (b *Beacon) {
 	b.conf = conf
 	conf.init()
 	b.init()
-	b.Setup()
+	b.setup()
 	return
 }
 
@@ -43,7 +43,7 @@ func (b *Beacon) init() {
 }
 
 
-func (b *Beacon) Setup() {
+func (b *Beacon) setup() {
 	b.logger.Println("Setting up")
 	b.setupListener()
 	b.setupSender()

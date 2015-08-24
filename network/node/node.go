@@ -5,8 +5,6 @@ import (
 	"github.com/hashicorp/serf/serf"
 	"net"
 	"fmt"
-	uuid "github.com/nu7hatch/gouuid"
-
 	"github.com/joernweissenborn/aurarath/config"
 	"github.com/joernweissenborn/eventual2go"
 	"strings"
@@ -37,18 +35,17 @@ type Node struct {
 	query eventual2go.StreamController
 }
 
-func New(cfg *config.Config, tags map[string]string) (node *Node) {
+func New(uuid string, cfg *config.Config, tags map[string]string) (node *Node) {
 
 	node = new(Node)
-	node.logger = log.New(cfg.Logger(),"Node ",log.Lshortfile)
+	node.logger = log.New(cfg.Logger(),fmt.Sprintf("node %s ",uuid),log.Lshortfile)
 
 	node.logger.Println("Initializing")
 
 	node.cfg = cfg
 	node.tags = tags
 
-	id, _ := uuid.NewV4()
-	node.UUID = id.String()
+	node.UUID = uuid
 	node.beacons = []*beacon.Beacon{}
 	node.mut = new(sync.RWMutex)
 	node.logger.Println("Launching Serf Agents")
@@ -193,6 +190,7 @@ func waitForQueryFinish(s eventual2go.StreamController, wg *sync.WaitGroup) {
 
 func (n *Node) Shutdown() {
 	for _, agt := range n.agents{
+		n.logger.Println("shutting down")
 		agt.Leave()
 		agt.Shutdown()
 	}

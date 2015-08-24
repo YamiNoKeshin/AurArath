@@ -1,4 +1,4 @@
-package aurarath
+package service
 import (
 	"testing"
 	"time"
