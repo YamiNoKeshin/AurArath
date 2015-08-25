@@ -31,6 +31,9 @@ func NewServiceConnection(uuid string) (sc *ServiceConnection){
 	return
 }
 
+func (sc *ServiceConnection) Uuid() string {
+	return sc.uuid
+}
 func (sc *ServiceConnection) Connected() *eventual2go.Future{
 	return sc.connected
 }

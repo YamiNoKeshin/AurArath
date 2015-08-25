@@ -65,6 +65,7 @@ func NewService(a *appdescriptor.AppDescriptor, servicetype string, cfg *config.
 	s.r = eventual2go.NewReactor()
 	s.r.React("service_arrived",s.serviceArrived)
 	s.r.React("service_gone",s.serviceGone)
+	s.r.React("announce_finish",s.announced)
 	s.r.React("service_shake_hand",s.serviceHandshake)
 	s.r.AddStream("service_shake_hand",s.in.Where(messages.Is(messages.HELLO)))
 	s.r.React("service_shake_hand_reply",s.serviceHandShakeReply)
@@ -78,12 +79,24 @@ func (s *Service) UUID() string{
 	return s.uuid
 }
 
+func (s *Service) NewServiceConnections() eventual2go.Stream{
+	return s.newpeers.Stream
+}
+func (s *Service) GoneServiceConnections() eventual2go.Stream{
+	return s.gonepeers.Stream
+}
 func (s *Service) Connected() *eventual2go.Future{
 	return s.connected
 }
 
 func (s *Service) Disconnected() *eventual2go.Future{
 	return s.disconnected
+}
+func (s *Service) Messages(t messages.MessageType) eventual2go.Stream{
+	return s.IncomingMessages(t).Transform(messages.ToMsg)
+}
+func (s *Service) IncomingMessages(t messages.MessageType) eventual2go.Stream{
+	return s.in.Where(messages.Is(t))
 }
 
 func (s *Service) Run() {
@@ -115,6 +128,7 @@ func (s *Service) createAnnouncer() {
 	s.announcer = NewAnnouncer(s.uuid,addrs,s.servicetype,s.appDescriptor)
 	s.r.AddStream("service_arrived",s.announcer.ServiceArrived())
 	s.r.AddStream("service_gone",s.announcer.ServiceGone())
+	s.r.AddFuture("announce_finish",s.announcer.Announced())
 }
 
 func (s *Service) serviceArrived(d eventual2go.Data) {
@@ -150,6 +164,7 @@ func (s *Service) removeServiceConnection(d eventual2go.Data) (eventual2go.Data)
 		s.logger.Println("Disconnected")
 		s.disconnected.Complete(nil)
 	}
+	s.gonepeers.Add(uuid)
 	return nil
 }
 
@@ -198,12 +213,19 @@ func (s *Service) serviceHandShakeReply(d eventual2go.Data) {
 	sc := s.connectedServices[m.Sender]
 
 	sc.ShakeHand(h.Codecs)
-	if !s.connected.IsComplete() {
+	if !s.connected.IsComplete() && s.announcer.Announced().IsComplete() {
 		s.logger.Println("Connected")
-		s.connected.Complete(m.Sender)
+		s.connected.Complete(nil)
 	}
+	s.newpeers.Add(sc)
 }
 
+func (s *Service) announced(eventual2go.Data){
+	if len(s.connectedServices) > 0 {
+		s.connected.Complete(nil)
+	}
+	return
+}
 func (s *Service) serviceConnectionExists(uuid string) (e bool){
 	_,e = s.connectedServices[uuid]
 	return
@@ -232,7 +254,7 @@ func (s *Service) Remove() {
 	for _, sc := range s.connectedServices{
 		sc.DisconnectAll()
 	}
-
+	s.r.Shutdown()
 	s.remove.Complete(nil)
 	s.logger.Println("Service Stopped",s.UUID())
 }

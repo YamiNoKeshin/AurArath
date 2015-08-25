@@ -4,31 +4,44 @@ import (
 	"github.com/joernweissenborn/aurarath/config"
 	"github.com/joernweissenborn/eventual2go"
 	"github.com/joernweissenborn/aurarath/messages"
+	"github.com/joernweissenborn/aurarath/service"
+	"github.com/joernweissenborn/aurarath/appdescriptor"
+	"log"
+	"fmt"
 )
 
 
 type Export struct {
-	*Service
+	*service.Service
 
 	requests eventual2go.Stream
 
+	r *eventual2go.Reactor
+
 	listeners map[string][]string
+
+	logger *log.Logger
 
 }
 
-func NewExport(a *AppDescriptor, cfg *config.Config) (e *Export){
+func NewExport(a *appdescriptor.AppDescriptor, cfg *config.Config) (e *Export){
 	e = new(Export)
-	e.Service = NewService(a, EXPORTING, cfg,[]byte{0})
-	e.requests = e.in.Where(messages.Is(messages.REQUEST)).Transform(messages.ToMsg)
+	e.Service = service.NewService(a, service.EXPORTING, cfg,[]byte{0})
+	e.logger = log.New(cfg.Logger(),fmt.Sprintf("export %s ",e.UUID()),log.Lshortfile)
+	e.requests = e.Messages(messages.REQUEST)
 	e.listeners = map[string][]string{}
-	e.in.Where(messages.Is(messages.LISTEN)).Listen(e.newListener)
-	e.in.Where(messages.Is(messages.STOP_LISTEN)).Listen(e.stopListener)
+	e.r = eventual2go.NewReactor()
+	e.r.React("listen",e.newListener)
+	e.r.AddStream("listen",e.IncomingMessages(messages.LISTEN))
+	e.r.React("listen_stop",e.stopListener)
+	e.r.AddStream("listen",e.IncomingMessages(messages.STOP_LISTEN))
+	e.r.React("reply",e.deliverResult)
 	return
 }
 
 func (e *Export) Reply(r *messages.Request, params []byte){
 	res := messages.NewResult(e.UUID(),r,params)
-	e.deliverResult(res)
+	e.r.Fire("reply",res)
 }
 
 func (e *Export) Requests() eventual2go.Stream {
@@ -38,8 +51,6 @@ func (e *Export) Requests() eventual2go.Stream {
 func (* Export) Emit(function string, parameter []byte){}
 
 func (e *Export) newListener(d eventual2go.Data){
-	e.m.Lock()
-	defer e.m.Unlock()
 	l := d.(messages.IncomingMessage)
 	f := l.Msg.(*messages.Listen).Function
 	e.logger.Println("New Listener",l.Sender,f)
@@ -94,14 +105,13 @@ func (e *Export) stopListener(d eventual2go.Data){
 	e.listeners[f] = ls[:len(ls)-2]
 }
 
-func (e *Export) deliverResult(result *messages.Result){
-	e.m.Lock()
-	defer e.m.Unlock()
+func (e *Export) deliverResult(d eventual2go.Data){
+	result := d.(*messages.Result)
 	e.logger.Println("Delivering result",result.Request.Function,result.Request.CallType)
 	switch result.Request.CallType {
 	case messages.ONE2MANY, messages.ONE2ONE:
-		if p := e.getPeer(result.Request.Importer); p != nil {
-			p.Send(messages.Flatten(result))
+		if sc := e.GetConnectedService(result.Request.Importer); sc != nil {
+			sc.Send(messages.Flatten(result))
 		}
 
 	case messages.MANY2MANY, messages.MANY2ONE:
@@ -115,9 +125,9 @@ func (e *Export) deliverResult(result *messages.Result){
 
 		}
 		e.logger.Println("Delivering MANY2",e.listeners[result.Request.Function])
-		for _, pid := range e.listeners[result.Request.Function] {
-			e.logger.Println("Sending res",pid,result.Request.Function)
-			e.getPeer(pid).Send(res)
+		for _, uuid := range e.listeners[result.Request.Function] {
+			e.logger.Println("Sending result",uuid,result.Request.Function)
+			e.GetConnectedService(uuid).Send(res)
 		}
 	}
 }

@@ -4,11 +4,14 @@ import (
 	"github.com/joernweissenborn/aurarath/config"
 	"github.com/joernweissenborn/aurarath/messages"
 	"github.com/joernweissenborn/eventual2go"
-	"github.com/joernweissenborn/aurarath/network/peer"
+	"github.com/joernweissenborn/aurarath/service"
+	"github.com/joernweissenborn/aurarath/appdescriptor"
+	"log"
+	"fmt"
 )
 
 type Import struct {
-	*Service
+	*service.Service
 
 	pending []*messages.Request
 
@@ -16,21 +19,23 @@ type Import struct {
 
 	listen []string
 
+	logger *log.Logger
 }
 
-func NewImport(a *AppDescriptor, cfg *config.Config) (i *Import){
+func NewImport(a *appdescriptor.AppDescriptor, cfg *config.Config) (i *Import){
 	i = new(Import)
-	i.Service = NewService(a, IMPORTING, cfg,[]byte{0})
-	i.connected.Then(i.onConnected)
-	i.newpeers.Listen(i.sendListenFunctions)
-	i.results = i.in.Where(messages.Is(messages.RESULT)).Transform(messages.ToMsg)
+	i.Service = service.NewService(a, service.IMPORTING, cfg,[]byte{0})
+	i.logger = log.New(cfg.Logger(),fmt.Sprintf("export %s ",i.UUID()),log.Lshortfile)
+	i.Connected().Then(i.onConnected)
+	i.NewServiceConnections().Listen(i.sendListenFunctions)
+	i.results = i.Messages(messages.RESULT)
 	return
 }
 
 func (i *Import) sendListenFunctions(d eventual2go.Data)  {
-	p := d.(*peer.Peer)
+	sc := d.(*service.ServiceConnection)
 	for _, f := range i.listen {
-		p.Send(messages.Flatten(&messages.Listen{f}))
+		sc.Send(messages.Flatten(&messages.Listen{f}))
 	}
 	return
 }
@@ -56,8 +61,8 @@ func (i *Import) Listen(function string) {
 		}
 	}
 	i.listen = append(i.listen, function)
-	for _,p := range i.getConnectedPeers() {
-		p.Send(messages.Flatten(&messages.Listen{function}))
+	for _,sc := range i.GetConnectedServices() {
+		sc.Send(messages.Flatten(&messages.Listen{function}))
 	}
 }
 
@@ -74,8 +79,8 @@ func (i *Import) StopListen(function string) {
 	}
 	i.listen[index] = i.listen[len(i.listen)-1]
 	i.listen = i.listen[:len(i.listen)-2]
-	for _,p := range i.getConnectedPeers() {
-		p.Send(messages.Flatten(&messages.StopListen{function}))
+	for _,sc := range i.GetConnectedServices() {
+		sc.Send(messages.Flatten(&messages.StopListen{function}))
 	}
 }
 
@@ -96,7 +101,7 @@ func (i *Import) Results() eventual2go.Stream {
 func (i *Import) call(function string, parameter []byte, ctype messages.CallType) (uuid string){
 
 	req := messages.NewRequest(i.UUID(),function,ctype,parameter)
-	if i.Service.connected.IsComplete() {
+	if i.Service.Connected().IsComplete() {
 		i.deliverRequest(req)
 	} else {
 		i.pending = append(i.pending,req)
@@ -114,9 +119,9 @@ func isRes(uuid string) eventual2go.Filter {
 
 
 func (i *Import) deliverRequest(r *messages.Request) {
-	for _, p := range i.getConnectedPeers() {
-		i.logger.Println("Delivering Request to",p.Uuid())
-		p.Send(messages.Flatten(r))
+	for _, sc := range i.GetConnectedServices() {
+		i.logger.Println("Delivering Request to",sc.Uuid())
+		sc.Send(messages.Flatten(r))
 		if r.CallType == messages.ONE2ONE || r.CallType == messages.MANY2ONE {
 			return
 		}

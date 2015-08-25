@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"github.com/joernweissenborn/eventual2go"
 	"github.com/joernweissenborn/aurarath"
+	"github.com/joernweissenborn/aurarath/appdescriptor"
 )
 
 func TestCallOne2One(t *testing.T) {
@@ -18,8 +19,8 @@ func TestCallOne2One(t *testing.T) {
 	i.Run()
 
 	e.Run()
-	<-i.Connected().AsChan()
-	<-e.Connected().AsChan()
+	i.Connected().WaitUntilComplete()
+	e.Connected().WaitUntilComplete()
 	params := []byte{4,5,63,4}
 	f := i.Call("SeyHello",params)
 
@@ -70,7 +71,10 @@ func TestCallMany2One(t *testing.T) {
 	i2.Run()
 	i1.Run()
 
-	time.Sleep(10*time.Second)
+	i1.Connected().WaitUntilComplete()
+	i2.Connected().WaitUntilComplete()
+	e.Connected().WaitUntilComplete()
+
 	i1.Listen("SayHello")
 	i2.Listen("SayHello")
 	time.Sleep(1*time.Second)
@@ -133,7 +137,11 @@ func TestCallOne2Many(t *testing.T) {
 	defer e2.Remove()
 	c2 := e2.Requests().AsChan()
 	e2.Run()
-	time.Sleep(10*time.Second)
+
+	i.Connected().WaitUntilComplete()
+	e1.Connected().WaitUntilComplete()
+	e2.Connected().WaitUntilComplete()
+
 	params := []byte{4,5,63,4}
 	params1 := []byte{3}
 	params2 := []byte{6}
@@ -200,16 +208,16 @@ func TestCallOne2Many(t *testing.T) {
 
 }
 
-var TEST_APP_DESCRIPTOR *aurarath.AppDescriptor = &aurarath.AppDescriptor{
-	[]aurarath.Function{
-		aurarath.Function{
+var TEST_APP_DESCRIPTOR *appdescriptor.AppDescriptor = &appdescriptor.AppDescriptor{
+	[]appdescriptor.Function{
+		appdescriptor.Function{
 			"SayHello",
-			[]aurarath.Parameter{
-				aurarath.Parameter{
+			[]appdescriptor.Parameter{
+				appdescriptor.Parameter{
 					"Greeting",
 					"string"}},
-			[]aurarath.Parameter{
-				aurarath.Parameter{
+			[]appdescriptor.Parameter{
+				appdescriptor.Parameter{
 					"Answer",
 					"string"}},
 		},

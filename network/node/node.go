@@ -169,7 +169,7 @@ func (n *Node) Queries() eventual2go.Stream {
 func (n *Node) Query(name string, data []byte, results eventual2go.StreamController) {
 	wg := new(sync.WaitGroup)
 	for iface, agt := range n.agents {
-		params := &serf.QueryParam{FilterTags:n.tags}
+		params := &serf.QueryParam{FilterTags:n.tags,Timeout: 1*time.Second}
 		resp, _ := agt.Query(name, data, params)
 		wg.Add(1)
 		go collectResponse(iface, resp, results, wg)

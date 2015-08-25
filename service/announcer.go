@@ -58,9 +58,14 @@ func NewAnnouncer(uuid string, addresses []string, servicetype string, desc *app
 	return
 }
 
+func (a *Announcer) Announced() *eventual2go.Future{
+	return a.announced
+}
+
 func (a *Announcer) ServiceArrived()eventual2go.Stream {
 	return a.new.Stream
 }
+
 func (a *Announcer) ServiceGone()eventual2go.Stream {
 	return a.node.Leave().Transform(toServiceGone)
 }
@@ -98,6 +103,7 @@ func (a *Announcer) collectAnnounceResponses(c chan eventual2go.Data) {
 		a.logger.Printf("got reply from %s at %s:%d",uuid,ip,port)
 		a.new.Add(ServiceArrived{uuid,r.Interface,ip,int(port)})
 	}
+	a.logger.Printf("finished announce")
 	a.announced.Complete(nil)
 }
 
