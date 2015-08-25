@@ -1,18 +1,14 @@
 package service
 
 import (
-	"github.com/joernweissenborn/aurarath/network/node"
 	"github.com/joernweissenborn/eventual2go"
 	"github.com/joernweissenborn/aurarath/config"
 	"github.com/joernweissenborn/aurarath/network/connection"
-	"encoding/binary"
-	"strings"
 	"log"
-	"github.com/joernweissenborn/aurarath/network/peer"
 	"github.com/joernweissenborn/aurarath/messages"
-	"sync"
 	"fmt"
 	"github.com/joernweissenborn/aurarath/appdescriptor"
+	uid "github.com/nu7hatch/gouuid"
 )
 
 
@@ -32,7 +28,7 @@ type Service struct {
 
 	in eventual2go.StreamController
 
-	peers map[string]*peer.Peer
+	connectedServices map[string]*ServiceConnection
 
 	servicetype string
 
@@ -49,6 +45,9 @@ type Service struct {
 
 func NewService(a *appdescriptor.AppDescriptor, servicetype string, cfg *config.Config, codecs []byte) (s *Service){
 	s = new(Service)
+	id,_:= uid.NewV4()
+	s.uuid = id.String()
+	s.logger = log.New(cfg.Logger(),fmt.Sprintf("service %s  ",id),log.Lshortfile)
 	s.appDescriptor = a
 	s.servicetype = servicetype
 	s.codecs = codecs
@@ -58,7 +57,7 @@ func NewService(a *appdescriptor.AppDescriptor, servicetype string, cfg *config.
 	s.incoming = map[string]*connection.Incoming{}
 	s.in = eventual2go.NewStreamController()
 
-	s.peers = map[string]*peer.Peer{}
+	s.connectedServices = map[string]*ServiceConnection{}
 	s.connected = eventual2go.NewFuture()
 	s.disconnected = eventual2go.NewFuture()
 	s.remove = eventual2go.NewFuture()
@@ -66,10 +65,10 @@ func NewService(a *appdescriptor.AppDescriptor, servicetype string, cfg *config.
 	s.r = eventual2go.NewReactor()
 	s.r.React("service_arrived",s.serviceArrived)
 	s.r.React("service_gone",s.serviceGone)
-	s.r.React("service_greeted",s.serviceGreeted)
-	s.r.AddStream(s.in.Where(messages.Is(messages.HELLO)))
-	s.r.React("service_greeted_back",s.serviceGreetedBack)
-	s.r.AddStream(s.in.Where(messages.Is(messages.HELLO_OK)))
+	s.r.React("service_shake_hand",s.serviceHandshake)
+	s.r.AddStream("service_shake_hand",s.in.Where(messages.Is(messages.HELLO)))
+	s.r.React("service_shake_hand_reply",s.serviceHandShakeReply)
+	s.r.AddStream("service_shake_hand_reply",s.in.Where(messages.Is(messages.HELLO_OK)))
 	s.createIncoming(cfg)
 	s.createAnnouncer()
 	return
@@ -97,6 +96,7 @@ func (s *Service) createIncoming(cfg *config.Config) {
 		incoming, err := connection.NewIncoming(addr)
 		if err == nil {
 			s.in.Join(incoming.In().Where(messages.Valid).Transform(messages.ToIncomingMsg))
+			s.logger.Println("port is", incoming.Port())
 			s.incoming[addr] = incoming
 		} else {
 			s.logger.Println("Error opening socket",err)
@@ -108,6 +108,7 @@ func (s *Service) createAnnouncer() {
 	addrs := []string{}
 
 	for addr,i := range s.incoming {
+		s.logger.Println(addr,i)
 		addrs = append(addrs,fmt.Sprintf("%s:%d",addr,i.Port()))
 	}
 
@@ -118,182 +119,118 @@ func (s *Service) createAnnouncer() {
 
 func (s *Service) serviceArrived(d eventual2go.Data) {
 	sa := d.(ServiceArrived)
-	if !s.peerExist(sa.UUID) {
-		s.c
+	s.logger.Println("Service arrived at",sa.Address,sa.Port)
+	if !s.serviceConnectionExists(sa.UUID) {
+		s.logger.Println("Service does not exist, creating",sa.UUID)
+		sc := s.createServiceConnection(sa.UUID)
+		sc.Connect(s.UUID(),sa.Address,sa.Port)
+		sc.Connected().Then(s.doHandShake(sa.Interface))
 	}
 }
 
 func (s *Service) serviceGone(d eventual2go.Data) {
-	s.m.Lock()
-	defer  s.m.Unlock()
-	r := d.(node.QueryResponseEvent)
-	buf := strings.Split(r.Response.From, "@")
-	if len(buf) != 2 {
-		return
-	}
-	uuid := buf[0]
-	ip := buf[1]
+	r := d.(ServiceGone)
 
-	if p, f:= s.peers[uuid];f{
-		p.CloseConnection(ip)
+	if sc, f:= s.connectedServices[r.UUID];f{
+		sc.Disconnect(r.Address)
 	}
 }
 
-func (s *Service) peerLeave(d eventual2go.Data) {
-	r := d.(node.LeaveEvent)
-	s.logger.Println("Peerleave",d)
-	buf := strings.Split(r.Name, "@")
-	if len(buf) != 2 {
-		return
-	}
-	uuid := buf[0]
-	s.removePeer(uuid)
-}
-
-func (s *Service) createPeer(uuid string) (p *peer.Peer) {
-	p = peer.New(uuid)
-	p.Disconnected().Then(s.removePeer)
-	s.newpeers.JoinFuture(p.Greeted())
-	s.peers[uuid] = p
+func (s *Service) createServiceConnection(uuid string) (sc *ServiceConnection) {
+	sc = NewServiceConnection(uuid)
+	sc.Disconnected().Then(s.removeServiceConnection)
+	s.connectedServices[uuid] = sc
 	return
 }
-func (s *Service) removePeer(d eventual2go.Data) (eventual2go.Data) {
-	s.m.Lock()
-	defer  s.m.Unlock()
+func (s *Service) removeServiceConnection(d eventual2go.Data) (eventual2go.Data) {
 	uuid := d.(string)
-	s.logger.Println("Removing peer",uuid)
-	delete(s.peers,uuid)
-	s.gonepeers.Add(uuid)
-	if len(s.peers) == 0 && !s.disconnected.IsComplete() {
+	s.logger.Println("Removing service connection",uuid)
+	delete(s.connectedServices,uuid)
+	if len(s.connectedServices) == 0 && !s.disconnected.IsComplete() {
 		s.logger.Println("Disconnected")
 		s.disconnected.Complete(nil)
 	}
 	return nil
 }
 
-func (s *Service) newPeer() {
-	s.m.Lock()
-	defer  s.m.Unlock()
-	r := d.(node.QueryResponseEvent)
-	buf := strings.Split(r.Response.From, "@")
-	if len(buf) != 2 {
-		return
+func (s *Service) serviceHandshake(d eventual2go.Data) {
+	m := d.(messages.IncomingMessage)
+	h := m.Msg.(*messages.Hello)
+
+	s.logger.Println("Got handshake:",m.Sender,h.Address,h.Port)
+
+	sc := s.connectedServices[m.Sender]
+	if sc == nil {
+		s.logger.Println("Service does not exist, creating",m.Sender)
+		sc = s.createServiceConnection(m.Sender)
 	}
+	sc.Connected().Then(s.doHandShakeReply())
 
-	uuid := buf[0]
-	ip := buf[1]
-	port := binary.LittleEndian.Uint16(r.Response.Payload)
-	s.logger.Println("Found Peer ",uuid)
-
-	p := s.peers[uuid]
-	if p == nil {
-		s.logger.Println("Peer does not exist, creating",uuid)
-		p = s.createPeer(uuid)
-		p.Connected().Then(s.greetPeer(r.Address))
-	}
-
-	p.OpenConnection(ip, port,s.UUID())
+	sc.Connect(s.UUID(), h.Address,h.Port)
 	s.logger.Println("DONE")
 
 }
 
 
-func (s *Service) greetPeer(iface string) eventual2go.CompletionHandler {
+func (s *Service) doHandShake(iface string) eventual2go.CompletionHandler {
 	return func(d eventual2go.Data) eventual2go.Data {
-		p := d.(*peer.Peer)
-		s.logger.Println("Greeting peer",p.Uuid())
+		sc := d.(*ServiceConnection)
+		s.logger.Println("doing handshake with",sc.uuid)
 		port := s.incoming[iface].Port()
-		p.Send(messages.Flatten(&messages.Hello{s.getDetails(),iface,int(port)}))
+		sc.DoHandshake(s.codecs,iface,port)
 		return nil
 	}
 }
 
-func (s *Service) greetPeerBack() eventual2go.CompletionHandler {
-	return func(d eventual2go.Data) eventual2go.Data {
-		p := d.(*peer.Peer)
-		s.logger.Println("Greeting peer back",p.Uuid())
-		p.Send(messages.Flatten(&messages.HelloOk{s.getDetails()}))
+func (s *Service) doHandShakeReply() eventual2go.CompletionHandler {
+	return func(d eventual2go.Data) eventual2go.Data{
+		sc := d.(*ServiceConnection)
+		s.logger.Println("replying handshake to",sc.uuid)
+		sc.DoHandshakeReply(s.codecs)
 		return nil
 	}
 }
 
-func (s *Service) peerGreeted(d eventual2go.Data) {
-	s.m.Lock()
-	defer  s.m.Unlock()
+func (s *Service) serviceHandShakeReply(d eventual2go.Data) {
 	m := d.(messages.IncomingMessage)
-	h := m.Msg.(*messages.Hello)
-	s.logger.Println("Got greeting from ",m.Sender)
-	p := s.peers[m.Sender]
-	if p == nil {
-		s.logger.Println("Peer does not exist, creating",m.Sender)
-		p = s.createPeer(m.Sender)
-		p.OpenConnection(h.Address, uint16(h.Port),s.UUID())
-	}
-	p.Connected().Then(s.greetPeerBack())
-	p.SetDetails(h.PeerDetails)
+	h := m.Msg.(*messages.HelloOk)
+	s.logger.Println("Got handshake reply from",m.Sender)
+	sc := s.connectedServices[m.Sender]
 
+	sc.ShakeHand(h.Codecs)
 	if !s.connected.IsComplete() {
 		s.logger.Println("Connected")
 		s.connected.Complete(m.Sender)
 	}
 }
 
-func (s *Service) peerGreetedBack(d eventual2go.Data) {
-	s.m.Lock()
-	defer  s.m.Unlock()
-	m := d.(messages.IncomingMessage)
-	h := m.Msg.(*messages.HelloOk)
-	s.logger.Println("Peer greeted back",m.Sender)
-	p := s.peers[m.Sender]
-	p.SetDetails(h.PeerDetails)
-	if !s.connected.IsComplete() {
-		s.connected.Complete(m.Sender)
-	}
-}
-
-func (s *Service) peerExist(uuid string) (e bool){
-	_,e = s.peers[uuid]
+func (s *Service) serviceConnectionExists(uuid string) (e bool){
+	_,e = s.connectedServices[uuid]
 	return
 }
-func (s *Service) getPeer(uuid string) (p *peer.Peer){
-	return s.peers[uuid]
+func (s *Service) GetConnectedService(uuid string) (sc *ServiceConnection){
+	return s.connectedServices[uuid]
 }
 
-func (s *Service) getDetails() peer.Details{
-	return peer.Details{s.codecs}
-}
-
-func (s *Service) getConnectedPeers() (peers []*peer.Peer){
-	s.m.RLock()
-	defer  s.m.RUnlock()
-	peers = []*peer.Peer{}
-	for _,p := range s.peers{
-		if p.Connected().IsComplete() && p.Greeted().IsComplete() {
-			peers = append(peers,p)
+func (s *Service) GetConnectedServices() (scs []*ServiceConnection){
+	scs = []*ServiceConnection{}
+	for _,sc := range s.connectedServices{
+		if sc.Connected().IsComplete() && sc.Handshake().IsComplete() {
+			scs = append(scs,sc)
 		}
 	}
 	return
 }
 
-func (s *Service) replyToService(d eventual2go.Data){
-	q := d.(node.QueryEvent)
-	s.logger.Println("Found Service on",q.Address)
-	if conn, f := s.incoming[q.Address];f {
-		repl := make([]byte,2)
-		binary.LittleEndian.PutUint16(repl,conn.Port())
-		q.Query.Respond(repl)
-
-	}
-}
 
 func (s *Service) Remove() {
 	s.logger.Println("Stopping Service",s.UUID())
-	s.node.Shutdown()
+	s.announcer.Shutdown()
 	for _, i := range s.incoming {
 		i.Close()
 	}
-	for _, p := range s.peers {
-		p.CloseAllConnections()
+	for _, sc := range s.connectedServices{
+		sc.DisconnectAll()
 	}
 
 	s.remove.Complete(nil)

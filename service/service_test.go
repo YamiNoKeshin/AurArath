@@ -3,17 +3,18 @@ import (
 	"testing"
 	"time"
 	"github.com/joernweissenborn/aurarath/config"
+	"github.com/joernweissenborn/aurarath/appdescriptor"
 )
 
 func TestServicBasics(t *testing.T){
-	a :=  new(AppDescriptor)
+	a :=  new(appdescriptor.AppDescriptor)
 	s1 := NewService(a,EXPORTING,config.DefaultLocalhost(),[]byte{0})
 	defer s1.Remove()
-	s2 := NewService(a,IMPORTING,config.DefaultLocalhost(),[]byte{0})
 	c := s1.Disconnected().AsChan()
 	c1 := s1.Connected().AsChan()
-	c2 := s2.Connected().AsChan()
 	s1.Run()
+	s2 := NewService(a,IMPORTING,config.DefaultLocalhost(),[]byte{0})
+	c2 := s2.Connected().AsChan()
 	s2.Run()
 
 select {

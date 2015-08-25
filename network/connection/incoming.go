@@ -15,7 +15,7 @@ type Incoming struct {
 	m *sync.Mutex
 
 	addr string
-	port uint16
+	port int
 	skt  *zmq4.Socket
 	in   eventual2go.StreamController
 	stopped bool
@@ -33,11 +33,11 @@ func NewIncoming(addr string) (i *Incoming, err error) {
 	return
 }
 
-func (i Incoming) In() eventual2go.Stream {
+func (i *Incoming) In() eventual2go.Stream {
 	return i.in.Stream
 }
 
-func (i Incoming) Port() (port uint16) {
+func (i *Incoming) Port() (port int) {
 	return i.port
 }
 func (i *Incoming) setupSocket() (err error) {
@@ -50,13 +50,13 @@ func (i *Incoming) setupSocket() (err error) {
 	return
 }
 
-func getRandomPort() uint16 {
+func getRandomPort() int {
 	l, err := net.Listen("tcp", ":0") // listen on address
 	if err != nil {
 		panic(fmt.Sprintf("Could not find a free port %v",err))
 	}
 	defer l.Close()
-	return uint16(l.Addr().(*net.TCPAddr).Port)
+	return l.Addr().(*net.TCPAddr).Port
 }
 
 func (i *Incoming) listen() {

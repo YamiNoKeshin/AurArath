@@ -41,7 +41,7 @@ func NewAnnouncer(uuid string, addresses []string, servicetype string, desc *app
 	for _, addr := range addresses {
 		as := strings.Split(addr,":")
 		addrs = append(addrs,as[0])
-		p, _ := strconv.ParseInt(as[1],10,16)
+		p, _ := strconv.ParseInt(as[1],0,0)
 		a.clientPorts[as[0]] = int(p)
 		a.logger.Println("adding address",as[0],int(p))
 	}
@@ -96,7 +96,7 @@ func (a *Announcer) collectAnnounceResponses(c chan eventual2go.Data) {
 		ip := buf[1]
 		port := binary.LittleEndian.Uint16(r.Response.Payload)
 		a.logger.Printf("got reply from %s at %s:%d",uuid,ip,port)
-		a.new.Add(ServiceArrived{uuid,ip,int(port)})
+		a.new.Add(ServiceArrived{uuid,r.Interface,ip,int(port)})
 	}
 	a.announced.Complete(nil)
 }
@@ -114,6 +114,7 @@ func (a *Announcer) replyToServiceQuery(d eventual2go.Data){
 
 type ServiceArrived struct {
 	UUID string
+	Interface string
 	Address string
 	Port int
 }

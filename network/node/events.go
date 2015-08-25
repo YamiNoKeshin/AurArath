@@ -16,7 +16,7 @@ func toQueryEvent(iface string) eventual2go.Transformer {
 }
 
 type QueryResponseEvent struct {
-	Address string
+	Interface string
 	Response serf.NodeResponse
 }
 

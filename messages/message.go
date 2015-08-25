@@ -4,6 +4,7 @@ import (
 	"github.com/joernweissenborn/aurarath/network"
 	"strconv"
 	"github.com/joernweissenborn/aurarath/network/connection"
+	"log"
 )
 
 
@@ -31,6 +32,7 @@ func Unflatten(m []string) (msg Message){
 }
 
 func Valid(d eventual2go.Data) bool {
+	log.Println("VALID",d)
 	m := d.(connection.Message).Payload
 	if len(m)<3 {
 		return false
