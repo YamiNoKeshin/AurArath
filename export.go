@@ -66,6 +66,7 @@ func (e *Export) newListener(d eventual2go.Data){
 	}
 	e.listeners[f] = append(ls,l.Sender)
 }
+
 func (e *Export) removeListener(d eventual2go.Data) {
 	l := d.(string)
 	for f, ls := range e.listeners {
@@ -84,6 +85,7 @@ func (e *Export) removeListener(d eventual2go.Data) {
 		e.listeners[f] = ls[:len(ls) - 2]
 	}
 }
+
 func (e *Export) stopListener(d eventual2go.Data){
 	l := d.(messages.IncomingMessage)
 	f := l.Msg.(*messages.StopListen).Function

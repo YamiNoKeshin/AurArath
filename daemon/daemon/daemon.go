@@ -1,57 +1,101 @@
 package daemon
 import (
-	"github.com/joernweissenborn/aurarath/network/beacon"
-	"net"
 	"github.com/joernweissenborn/eventual2go"
-	"time"
 	"github.com/joernweissenborn/aurarath/network/connection"
+	"log"
+	"os"
+	"github.com/joernweissenborn/aurarath/service"
 )
 
 
 type Daemon struct {
-	peers map[string] eventual2go.StreamController
+	
+	clients map[string] eventual2go.StreamController
+	announcer map[string] *service.Announcer
+	
+	logger *log.Logger
+	
 }
 
-func New() (d *Daemon) {
+func New(addr string, port int) (d *Daemon) {
 
 	d = new(Daemon)
-	incoming,_ := connection.NewIncoming("127.0.0.1")
+
+	d.clients = map[string]eventual2go.StreamController{}
+	d.announcer = map[string]*service.Announcer{}
+
+	d.logger = log.New(os.Stdout,"daemon ",log.Lshortfile)
+	d.logger.Println("starting up")
+
+	incoming,_ := connection.NewIncoming(addr)
+	d.logger.Println("launched incoming at",incoming.Port())
+
 	msg := incoming.In().Where(ValidMessage)
+
+	ct := NewClientTracker(addr,port)
+
 	r := eventual2go.NewReactor()
-	pt := NewPeerTracker()
-	r.React("new_peer",d.newPeer(incoming.Port()))
-	r.AddStream("new_peer",pt.new)
-	r.React("gone_peer",d.peerGone)
-	r.AddStream("new_peer",pt.gone)
-	r.React("peer_export",d.peerExport)
-	r.AddStream("peer_export",msg.Where(IsMessage(EXPORT)).Transform(ToNewServiceMessage))
-	r.React("peer_import",d.peerImport)
-	r.AddStream("peer_import",msg.Where(IsMessage(IMPORT)).Transform(ToNewServiceMessage))
+
+	r.React("new_client",d.newClient(incoming.Port()))
+	r.AddStream("new_client",ct.new.Stream)
+
+	r.React("client_gone",d.clientGone)
+	r.AddStream("client_gone",ct.gone.Stream)
+
+	r.React("client_service",d.clientService)
+	r.AddStream("client_service",msg.Where(IsMessage(EXPORT)).Transform(ToNewServiceMessage))
+	r.AddStream("client_service",msg.Where(IsMessage(IMPORT)).Transform(ToNewServiceMessage))
+
+	d.logger.Println("starting tracker")
+	ct.Run()
+
+	d.logger.Println("started")
+	return
 }
 
-func (d *Daemon) newPeer(port int)eventual2go.Subscription {
-	return func(d eventual2go.Data) {
-		np := d.(NewPeer)
+func (d *Daemon) newClient(port int)eventual2go.Subscriber {
+	return func(data eventual2go.Data) {
+		np := data.(Newclient)
+		d.logger.Println("new client",np)
 		conn,err := connection.NewOutgoing("AURARATH_DAEMON","127.0.0.1",np.Port)
 		if err != nil {
+			d.logger.Println("error opening connection:",err)
 			return
 		}
 		conn.Add(NewHello(port))
-		d.peers[np.UUID] = conn
+		d.clients[np.UUID] = conn
 
 	}
 }
 
-func (d *Daemon) peerGone(d eventual2go.Data) {
-	gp := d.(string)
-	d.peers[gp].Close()
+func (d *Daemon) clientGone(data eventual2go.Data) {
+	gp := data.(string)
+	d.clients[gp].Close()
 }
 
 
-func (d *Daemon) peerExport(d eventual2go.Data) {
+func (d *Daemon) clientService(data eventual2go.Data) {
+	m := data.(NewService)
+	d.logger.Println("new service",m)
+	a := service.NewAnnouncer(m.UUID,m.Addresses,m.ServiceType,m.Descriptor)
+	client := d.clients[m.UUID]
+	a.ServiceArrived().Listen(serviceArrived(client))
+	a.ServiceGone().Listen(serviceGone(client))
+	a.Run()
+	d.announcer[m.UUID] = a
 }
 
-func (d *Daemon) peerImport(d eventual2go.Data) {
+func serviceArrived(client eventual2go.StreamController) eventual2go.Subscriber {
+	return func(d eventual2go.Data) {
+		sa := d.(service.ServiceArrived)
+		client.Add(NewServiceArrived(sa))
+	}
+}
+func serviceGone(client eventual2go.StreamController) eventual2go.Subscriber {
+	return func(d eventual2go.Data) {
+		uuid := d.(string)
+		client.Add(NewServiceGone(uuid))
+	}
 }
 
 

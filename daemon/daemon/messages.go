@@ -3,43 +3,40 @@ import (
 	"strconv"
 	"github.com/joernweissenborn/eventual2go"
 	"github.com/joernweissenborn/aurarath/network/connection"
-	"bytes"
-	"github.com/joernweissenborn/aurarath"
 	"encoding/json"
+	"github.com/joernweissenborn/aurarath/appdescriptor"
+	"github.com/joernweissenborn/aurarath/service"
 )
 
 const PROTOCOL_SIGNATURE byte = 0xA1
 
 const (
-	HELLO int = iota
+	HELLO uint8 = iota
 	EXPORT
 	IMPORT
-	MEMBER_FOUND
-	MEMBER_GONE
+	SERVICE_ARRIVE
+	SERVICE_GONE
 )
 
 func NewHello(port int) [][]byte {
-	return [][]byte{PROTOCOL_SIGNATURE,HELLO,[]byte(strconv.FormatInt(port,10))}
+	return [][]byte{[]byte{byte(PROTOCOL_SIGNATURE)},[]byte{byte(HELLO)},[]byte(strconv.FormatInt(int64(port),10))}
 }
 
-func IsMessage(t int) eventual2go.Filter {
+func IsMessage(t uint8) eventual2go.Filter {
 	return func(d eventual2go.Data) bool {
 		m := d.(connection.Message).Payload
-		return  m[2] == t
+		return  []byte(m[2])[0] == t
 	}
 }
 
 func ValidMessage(d eventual2go.Data) bool {
 	m := d.(connection.Message).Payload
-	if !bytes.Equal(m[1],PROTOCOL_SIGNATURE) {
-		return false
-	}
-	return m[2] == EXPORT,m[2] == IMPORT
+	return m[1][0] == PROTOCOL_SIGNATURE
 }
 
 type NewService struct {
 	UUID string
-	Descriptor *aurarath.AppDescriptor
+	Descriptor *appdescriptor.AppDescriptor
 	Addresses []string
 	ServiceType string
 }
@@ -47,25 +44,44 @@ type NewService struct {
 func ToNewServiceMessage(d eventual2go.Data) eventual2go.Data{
 	m := d.(connection.Message).Payload
 	var nsm NewService
-	json.Unmarshal(m[3],&nsm)
+	json.Unmarshal([]byte(m[3]),&nsm)
 	return nsm
 }
 
-type MemberFound struct {
-	UUID string
-	Address string
-	Port int
+
+func ToServiceArrivedMessage(d eventual2go.Data) eventual2go.Data{
+	m := d.(connection.Message).Payload
+	var nsm service.ServiceArrived
+	json.Unmarshal([]byte(m[3]),&nsm)
+	return nsm
 }
 
-func NewMemberFound(uuid, address string, port int) [][]byte {
-	b, _ := json.Marshal(MemberFound{uuid,address,port})
-	return [][]byte{[]byte{PROTOCOL_SIGNATURE},[]byte{MEMBER_FOUND},b}
-}
-type MemberGone struct {
-	UUID string
+
+func ToServiceGone(d eventual2go.Data) eventual2go.Data{
+	m := d.(connection.Message).Payload
+	return m[3]
 }
 
-func NewMemberGone(uuid string) [][]byte {
-	b, _ := json.Marshal(MemberGone{uuid})
-	return [][]byte{[]byte{PROTOCOL_SIGNATURE},[]byte{MEMBER_GONE},b}
+func (ns NewService) flatten() [][]byte{
+	b,_ := json.Marshal(ns)
+
+	var m uint8
+
+	if ns.ServiceType == service.EXPORTING {
+		m = EXPORT
+	} else {
+		m = IMPORT
+	}
+
+	return [][]byte{[]byte{PROTOCOL_SIGNATURE},[]byte{m},b}
+}
+
+func NewServiceArrived(sa service.ServiceArrived) [][]byte {
+	b, _ := json.Marshal(sa)
+	return [][]byte{[]byte{PROTOCOL_SIGNATURE},[]byte{SERVICE_ARRIVE},b}
+}
+
+
+func NewServiceGone(uuid string) [][]byte {
+	return [][]byte{[]byte{PROTOCOL_SIGNATURE},[]byte{SERVICE_GONE},[]byte(uuid)}
 }
