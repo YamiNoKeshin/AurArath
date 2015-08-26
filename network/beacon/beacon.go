@@ -39,7 +39,7 @@ func (b *Beacon) init() {
 	b.outConns = []*net.UDPConn{}
 	b.silence = eventual2go.NewFuture()
 	b.silent = true
-	b.logger = log.New(b.conf.Logger,"Beacon",log.Lshortfile)
+	b.logger = log.New(b.conf.Logger,"beacon ",log.Lshortfile)
 }
 
 

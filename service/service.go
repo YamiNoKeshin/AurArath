@@ -121,7 +121,6 @@ func (s *Service) createAnnouncer() {
 	addrs := []string{}
 
 	for addr,i := range s.incoming {
-		s.logger.Println(addr,i)
 		addrs = append(addrs,fmt.Sprintf("%s:%d",addr,i.Port()))
 	}
 
@@ -172,18 +171,16 @@ func (s *Service) serviceHandshake(d eventual2go.Data) {
 	m := d.(messages.IncomingMessage)
 	h := m.Msg.(*messages.Hello)
 
-	s.logger.Println("Got handshake:",m.Sender,h.Address,h.Port)
+	s.logger.Println("got handshake from",m.Sender,h.Address,h.Port)
 
 	sc := s.connectedServices[m.Sender]
 	if sc == nil {
-		s.logger.Println("Service does not exist, creating",m.Sender)
+		s.logger.Println("service does not exist, creating",m.Sender)
 		sc = s.createServiceConnection(m.Sender)
 	}
 	sc.Connected().Then(s.doHandShakeReply())
 
 	sc.Connect(s.UUID(), h.Address,h.Port)
-	s.logger.Println("DONE")
-
 }
 
 
@@ -209,19 +206,21 @@ func (s *Service) doHandShakeReply() eventual2go.CompletionHandler {
 func (s *Service) serviceHandShakeReply(d eventual2go.Data) {
 	m := d.(messages.IncomingMessage)
 	h := m.Msg.(*messages.HelloOk)
-	s.logger.Println("Got handshake reply from",m.Sender)
+	s.logger.Println("got handshake reply from",m.Sender)
 	sc := s.connectedServices[m.Sender]
 
 	sc.ShakeHand(h.Codecs)
 	if !s.connected.IsComplete() && s.announcer.Announced().IsComplete() {
-		s.logger.Println("Connected")
+		s.logger.Println("connected")
 		s.connected.Complete(nil)
 	}
+	sc.DoHandshakeReply(s.codecs)
 	s.newpeers.Add(sc)
 }
 
 func (s *Service) announced(eventual2go.Data){
 	if len(s.connectedServices) > 0 {
+		s.logger.Println("connected")
 		s.connected.Complete(nil)
 	}
 	return

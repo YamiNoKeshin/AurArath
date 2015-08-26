@@ -2,7 +2,6 @@ package messages
 import (
 	"encoding/gob"
 	"github.com/joernweissenborn/eventual2go"
-	"log"
 )
 
 
@@ -48,6 +47,5 @@ func init(){
 
 func Is(t MessageType) eventual2go.Filter {
 	return func(d eventual2go.Data) bool {
-		log.Println("IS",d)
 		return d.(IncomingMessage).Msg.GetType() == t}
 }

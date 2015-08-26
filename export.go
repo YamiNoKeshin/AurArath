@@ -116,15 +116,7 @@ func (e *Export) deliverResult(d eventual2go.Data){
 
 	case messages.MANY2MANY, messages.MANY2ONE:
 		res := messages.Flatten(result)
-		e.logger.Println("Delivering MANY2",result.Request.Function)
-		e.logger.Println("Delivering MANY2",e.listeners)
-		for k := range e.listeners {
-			e.logger.Println("Delivering MANY2",k)
-			e.logger.Println("Delivering MANY2",[]byte(k))
-			e.logger.Println("Delivering MANY2",[]byte(result.Request.Function))
-
-		}
-		e.logger.Println("Delivering MANY2",e.listeners[result.Request.Function])
+		e.logger.Printf("sending many2 result to %d clients",len(e.listeners))
 		for _, uuid := range e.listeners[result.Request.Function] {
 			e.logger.Println("Sending result",uuid,result.Request.Function)
 			e.GetConnectedService(uuid).Send(res)

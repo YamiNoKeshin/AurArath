@@ -38,7 +38,6 @@ func TestCallOne2One(t *testing.T) {
 		e.Reply(r,params)
 	}
 
-
 	select {
 	case <-time.After(2*time.Second):
 		t.Fatal("Didnt Got Request")
@@ -51,8 +50,6 @@ func TestCallOne2One(t *testing.T) {
 			t.Error("Wrong Params",r.Parameter(),params)
 		}
 	}
-
-
 }
 
 func TestCallMany2One(t *testing.T) {

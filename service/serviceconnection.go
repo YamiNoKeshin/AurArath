@@ -18,6 +18,8 @@ type ServiceConnection struct {
 	handshake *eventual2go.Future
 	codecs []byte
 
+	handshaked bool
+
 }
 
 func NewServiceConnection(uuid string) (sc *ServiceConnection){
@@ -72,8 +74,12 @@ func (sc *ServiceConnection) DoHandshake(codecs []byte,address string, port int)
 }
 
 func (sc *ServiceConnection) DoHandshakeReply(codecs []byte){
+	if sc.handshaked {
+		return
+	}
 	m := &messages.HelloOk{codecs}
 	sc.Send(messages.Flatten(m))
+	sc.handshaked = true
 }
 
 
