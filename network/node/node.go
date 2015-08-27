@@ -30,9 +30,9 @@ type Node struct {
 
 	logger *log.Logger
 
-	join eventual2go.StreamController
-	leave eventual2go.StreamController
-	query eventual2go.StreamController
+	join *eventual2go.StreamController
+	leave *eventual2go.StreamController
+	query *eventual2go.StreamController
 }
 
 func New(uuid string, cfg *config.Config, tags map[string]string) (node *Node) {
@@ -154,19 +154,19 @@ func (n *Node) recvPeerSignal(d eventual2go.Data) {
 	}
 }
 
-func (n *Node) Join() eventual2go.Stream {
+func (n *Node) Join() *eventual2go.Stream {
 	return n.join.Stream
 }
 
-func (n *Node) Leave() eventual2go.Stream {
+func (n *Node) Leave() *eventual2go.Stream {
 	return n.leave.Stream
 }
 
-func (n *Node) Queries() eventual2go.Stream {
+func (n *Node) Queries() *eventual2go.Stream {
 	return n.query.Stream
 }
 
-func (n *Node) Query(name string, data []byte, results eventual2go.StreamController) {
+func (n *Node) Query(name string, data []byte, results *eventual2go.StreamController) {
 	wg := new(sync.WaitGroup)
 	for iface, agt := range n.agents {
 		params := &serf.QueryParam{FilterTags:n.tags,Timeout: 1*time.Second}
@@ -177,13 +177,13 @@ func (n *Node) Query(name string, data []byte, results eventual2go.StreamControl
 	go waitForQueryFinish(results,wg)
 }
 
-func collectResponse(iface string,resp *serf.QueryResponse, s eventual2go.StreamController, wg *sync.WaitGroup){
+func collectResponse(iface string,resp *serf.QueryResponse, s *eventual2go.StreamController, wg *sync.WaitGroup){
 	for r := range resp.ResponseCh() {
 		s.Add(QueryResponseEvent{iface,r})
 	}
 	wg.Done()
 }
-func waitForQueryFinish(s eventual2go.StreamController, wg *sync.WaitGroup) {
+func waitForQueryFinish(s *eventual2go.StreamController, wg *sync.WaitGroup) {
 	wg.Wait()
 	s.Close()
 }

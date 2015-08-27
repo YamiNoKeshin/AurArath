@@ -19,10 +19,10 @@ type Announcer struct{
 
 	clientPorts map[string]int
 
-	new eventual2go.StreamController
+	new *eventual2go.StreamController
 	logger *log.Logger
 
-	announced *eventual2go.Future
+	announced *eventual2go.Completer
 }
 
 func NewAnnouncer(uuid string, addresses []string, servicetype string, desc *appdescriptor.AppDescriptor) (a *Announcer){
@@ -30,7 +30,7 @@ func NewAnnouncer(uuid string, addresses []string, servicetype string, desc *app
 	cfg := config.DefaultLocalhost()
 
 	a = new(Announcer)
-	a.announced = eventual2go.NewFuture()
+	a.announced = eventual2go.NewCompleter()
 	a.logger = log.New(cfg.Logger(),fmt.Sprintf("announcer %s ",uuid),log.Lshortfile)
 
 	a.new = eventual2go.NewStreamController()
@@ -59,14 +59,14 @@ func NewAnnouncer(uuid string, addresses []string, servicetype string, desc *app
 }
 
 func (a *Announcer) Announced() *eventual2go.Future{
-	return a.announced
+	return a.announced.Future()
 }
 
-func (a *Announcer) ServiceArrived()eventual2go.Stream {
+func (a *Announcer) ServiceArrived() *eventual2go.Stream {
 	return a.new.Stream
 }
 
-func (a *Announcer) ServiceGone()eventual2go.Stream {
+func (a *Announcer) ServiceGone() *eventual2go.Stream {
 	return a.node.Leave().Transform(toServiceGone)
 }
 

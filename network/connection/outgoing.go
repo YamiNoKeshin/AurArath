@@ -15,7 +15,7 @@ type Outgoing struct {
 	targetPort int
 }
 
-func NewOutgoing(uuid string, targetAddress string, targetPort int) (out eventual2go.StreamController, err error) {
+func NewOutgoing(uuid string, targetAddress string, targetPort int) (out *eventual2go.StreamController, err error) {
 
 	var o Outgoing
 
@@ -39,7 +39,7 @@ func NewOutgoing(uuid string, targetAddress string, targetPort int) (out eventua
 	}
 	out = eventual2go.NewStreamController()
 	out.Stream.Listen(o.send)
-	out.Stream.Closed.Then(o.Close)
+	out.Stream.Closed().Then(o.Close)
 	return
 }
 

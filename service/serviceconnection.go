@@ -10,12 +10,12 @@ type ServiceConnection struct {
 
 	uuid string
 
-	connections map[string]eventual2go.StreamController
+	connections map[string]*eventual2go.StreamController
 
-	connected *eventual2go.Future
-	disconnected *eventual2go.Future
+	connected *eventual2go.Completer
+	disconnected *eventual2go.Completer
 
-	handshake *eventual2go.Future
+	handshake *eventual2go.Completer
 	codecs []byte
 
 	handshaked bool
@@ -25,10 +25,10 @@ type ServiceConnection struct {
 func NewServiceConnection(uuid string) (sc *ServiceConnection){
 	sc = new(ServiceConnection)
 	sc.uuid = uuid
-	sc.connections = map[string]eventual2go.StreamController{}
-	sc.connected = eventual2go.NewFuture()
-	sc.disconnected = eventual2go.NewFuture()
-	sc.handshake = eventual2go.NewFuture()
+	sc.connections = map[string]*eventual2go.StreamController{}
+	sc.connected = eventual2go.NewCompleter()
+	sc.disconnected = eventual2go.NewCompleter()
+	sc.handshake = eventual2go.NewCompleter()
 
 	return
 }
@@ -37,15 +37,15 @@ func (sc *ServiceConnection) Uuid() string {
 	return sc.uuid
 }
 func (sc *ServiceConnection) Connected() *eventual2go.Future{
-	return sc.connected
+	return sc.connected.Future()
 }
 
 func (sc *ServiceConnection) Disconnected() *eventual2go.Future{
-	return sc.disconnected
+	return sc.disconnected.Future()
 }
 
 func (sc *ServiceConnection) Handshake() *eventual2go.Future{
-	return sc.handshake
+	return sc.handshake.Future()
 }
 
 func (sc *ServiceConnection) Connect(name, address string, port int) {
@@ -54,7 +54,7 @@ func (sc *ServiceConnection) Connect(name, address string, port int) {
 		sc.connections[address], err = connection.NewOutgoing(name, address, port)
 		if err != nil {
 			delete(sc.connections,address)
-		} else if !sc.connected.IsComplete() {
+		} else if !sc.connected.Completed() {
 			sc.connected.Complete(sc)
 		}
 	}
@@ -100,7 +100,7 @@ func (sc *ServiceConnection) DisconnectAll() {
 }
 
 func (sc *ServiceConnection) Send(msg [][]byte) (err error) {
-	if !sc.connected.IsComplete(){
+	if !sc.connected.Completed(){
 		return errors.New("Not Connected")
 	}
 	for _, conn := range sc.connections {

@@ -36,7 +36,7 @@ func TestServicBasics(t *testing.T){
 	s2.Remove()
 	select {
 	case <-time.After(10*time.Second):
-		t.Error("Service 2 Did Not Disconnect", s1.disconnected.IsComplete())
+		t.Error("Service 2 Did Not Disconnect")
 
 	case <-c:
 		t.Log("Successfully Disconnected Service 2")

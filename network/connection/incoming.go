@@ -17,7 +17,7 @@ type Incoming struct {
 	addr string
 	port int
 	skt  *zmq4.Socket
-	in   eventual2go.StreamController
+	in   *eventual2go.StreamController
 	stopped bool
 }
 
@@ -33,7 +33,7 @@ func NewIncoming(addr string) (i *Incoming, err error) {
 	return
 }
 
-func (i *Incoming) In() eventual2go.Stream {
+func (i *Incoming) In() *eventual2go.Stream {
 	return i.in.Stream
 }
 

@@ -14,10 +14,10 @@ func newEventHandler() (eh eventHandler){
 }
 
 type eventHandler struct {
-	stream eventual2go.StreamController
-	join eventual2go.Stream
-	leave eventual2go.Stream
-	query eventual2go.Stream
+	stream *eventual2go.StreamController
+	join *eventual2go.Stream
+	leave *eventual2go.Stream
+	query *eventual2go.Stream
 }
 
 func (eh eventHandler) HandleEvent(evt serf.Event) {

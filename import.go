@@ -15,7 +15,7 @@ type Import struct {
 
 	pending []*messages.Request
 
-	results eventual2go.Stream
+	results *eventual2go.Stream
 
 	listen []string
 
@@ -47,7 +47,7 @@ func (i *Import) Call(function string, parameter []byte) (f *eventual2go.Future)
 	return
 }
 
-func (i *Import) CallAll(function string, parameter []byte, s eventual2go.StreamController){
+func (i *Import) CallAll(function string, parameter []byte, s *eventual2go.StreamController){
 	i.logger.Println("CallAll", function)
 	uuid := i.call(function,parameter, messages.ONE2MANY)
 	s.Join(i.results.Where(isRes(uuid)))
@@ -92,7 +92,7 @@ func (i *Import) TriggerAll(function string, parameter []byte)   {
 	i.call(function,parameter,messages.MANY2MANY)
 }
 
-func (i *Import) Results() eventual2go.Stream {
+func (i *Import) Results() *eventual2go.Stream {
 	return i.results.Where(func (d eventual2go.Data) bool {
 		return d.(*messages.Result).Request.CallType == messages.MANY2MANY || d.(*messages.Result).Request.CallType == messages.MANY2ONE
 	})
@@ -101,7 +101,7 @@ func (i *Import) Results() eventual2go.Stream {
 func (i *Import) call(function string, parameter []byte, ctype messages.CallType) (uuid string){
 
 	req := messages.NewRequest(i.UUID(),function,ctype,parameter)
-	if i.Service.Connected().IsComplete() {
+	if i.Service.Connected().Completed() {
 		i.deliverRequest(req)
 	} else {
 		i.pending = append(i.pending,req)

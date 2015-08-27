@@ -17,8 +17,8 @@ type ClientTracker struct {
 
 	clients map[string]time.Time
 
-	new eventual2go.StreamController
-	gone eventual2go.StreamController
+	new *eventual2go.StreamController
+	gone *eventual2go.StreamController
 
 	logger *log.Logger
 }
@@ -47,11 +47,11 @@ func (p *ClientTracker) Run() {
 	}(r)
 }
 
-func (p *ClientTracker) New() eventual2go.Stream {
+func (p *ClientTracker) New() *eventual2go.Stream {
 	return p.new.Stream
 }
 
-func (p *ClientTracker) Gone() eventual2go.Stream {
+func (p *ClientTracker) Gone() *eventual2go.Stream {
 	return p.gone.Stream
 }
 
@@ -74,7 +74,7 @@ func (p *ClientTracker) checkclients(d eventual2go.Data) {
 }
 
 
-func (p *ClientTracker) listenUdp() eventual2go.Stream{
+func (p *ClientTracker) listenUdp() *eventual2go.Stream{
 	addr := &net.UDPAddr{IP: net.ParseIP(p.address),Port:p.port}
 	p.logger.Println("Starting to listen on",addr)
 	conn, err := net.ListenUDP("udp4",addr)
@@ -83,7 +83,7 @@ func (p *ClientTracker) listenUdp() eventual2go.Stream{
 		panic(err)
 	}
 	s := eventual2go.NewStreamController()
-	go func(stream eventual2go.StreamController){
+	go func(stream *eventual2go.StreamController){
 		for {
 			data := make([]byte, 128)
 			read, _, _ := conn.ReadFromUDP(data)

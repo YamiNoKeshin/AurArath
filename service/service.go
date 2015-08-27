@@ -22,11 +22,11 @@ type Service struct {
 
 	announcer *Announcer
 
-	remove *eventual2go.Future
+	remove *eventual2go.Completer
 
 	incoming map[string]*connection.Incoming
 
-	in eventual2go.StreamController
+	in *eventual2go.StreamController
 
 	connectedServices map[string]*ServiceConnection
 
@@ -36,11 +36,11 @@ type Service struct {
 
 	logger *log.Logger
 
-	connected *eventual2go.Future
-	disconnected *eventual2go.Future
+	connected *eventual2go.Completer
+	disconnected *eventual2go.Completer
 
-	newpeers eventual2go.StreamController
-	gonepeers eventual2go.StreamController
+	newpeers *eventual2go.StreamController
+	gonepeers *eventual2go.StreamController
 }
 
 func NewService(a *appdescriptor.AppDescriptor, servicetype string, cfg *config.Config, codecs []byte) (s *Service){
@@ -58,9 +58,9 @@ func NewService(a *appdescriptor.AppDescriptor, servicetype string, cfg *config.
 	s.in = eventual2go.NewStreamController()
 
 	s.connectedServices = map[string]*ServiceConnection{}
-	s.connected = eventual2go.NewFuture()
-	s.disconnected = eventual2go.NewFuture()
-	s.remove = eventual2go.NewFuture()
+	s.connected = eventual2go.NewCompleter()
+	s.disconnected = eventual2go.NewCompleter()
+	s.remove = eventual2go.NewCompleter()
 
 	s.r = eventual2go.NewReactor()
 	s.r.React("service_arrived",s.serviceArrived)
@@ -79,23 +79,23 @@ func (s *Service) UUID() string{
 	return s.uuid
 }
 
-func (s *Service) NewServiceConnections() eventual2go.Stream{
+func (s *Service) NewServiceConnections() *eventual2go.Stream{
 	return s.newpeers.Stream
 }
-func (s *Service) GoneServiceConnections() eventual2go.Stream{
+func (s *Service) GoneServiceConnections() *eventual2go.Stream{
 	return s.gonepeers.Stream
 }
 func (s *Service) Connected() *eventual2go.Future{
-	return s.connected
+	return s.connected.Future()
 }
 
 func (s *Service) Disconnected() *eventual2go.Future{
-	return s.disconnected
+	return s.disconnected.Future()
 }
-func (s *Service) Messages(t messages.MessageType) eventual2go.Stream{
+func (s *Service) Messages(t messages.MessageType) *eventual2go.Stream{
 	return s.IncomingMessages(t).Transform(messages.ToMsg)
 }
-func (s *Service) IncomingMessages(t messages.MessageType) eventual2go.Stream{
+func (s *Service) IncomingMessages(t messages.MessageType) *eventual2go.Stream{
 	return s.in.Where(messages.Is(t))
 }
 
@@ -159,7 +159,7 @@ func (s *Service) removeServiceConnection(d eventual2go.Data) (eventual2go.Data)
 	uuid := d.(string)
 	s.logger.Println("Removing service connection",uuid)
 	delete(s.connectedServices,uuid)
-	if len(s.connectedServices) == 0 && !s.disconnected.IsComplete() {
+	if len(s.connectedServices) == 0 && !s.disconnected.Completed() {
 		s.logger.Println("Disconnected")
 		s.disconnected.Complete(nil)
 	}
@@ -210,7 +210,7 @@ func (s *Service) serviceHandShakeReply(d eventual2go.Data) {
 	sc := s.connectedServices[m.Sender]
 
 	sc.ShakeHand(h.Codecs)
-	if !s.connected.IsComplete() && s.announcer.Announced().IsComplete() {
+	if !s.connected.Completed() && s.announcer.Announced().Completed() {
 		s.logger.Println("connected")
 		s.connected.Complete(nil)
 	}
@@ -236,7 +236,7 @@ func (s *Service) GetConnectedService(uuid string) (sc *ServiceConnection){
 func (s *Service) GetConnectedServices() (scs []*ServiceConnection){
 	scs = []*ServiceConnection{}
 	for _,sc := range s.connectedServices{
-		if sc.Connected().IsComplete() && sc.Handshake().IsComplete() {
+		if sc.Connected().Completed() && sc.Handshake().Completed() {
 			scs = append(scs,sc)
 		}
 	}

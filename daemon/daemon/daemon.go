@@ -10,7 +10,7 @@ import (
 
 type Daemon struct {
 	
-	clients map[string] eventual2go.StreamController
+	clients map[string] *eventual2go.StreamController
 	announcer map[string] *service.Announcer
 	
 	logger *log.Logger
@@ -21,7 +21,7 @@ func New(addr string, port int) (d *Daemon) {
 
 	d = new(Daemon)
 
-	d.clients = map[string]eventual2go.StreamController{}
+	d.clients = map[string]*eventual2go.StreamController{}
 	d.announcer = map[string]*service.Announcer{}
 
 	d.logger = log.New(os.Stdout,"daemon ",log.Lshortfile)
@@ -85,13 +85,13 @@ func (d *Daemon) clientService(data eventual2go.Data) {
 	d.announcer[m.UUID] = a
 }
 
-func serviceArrived(client eventual2go.StreamController) eventual2go.Subscriber {
+func serviceArrived(client *eventual2go.StreamController) eventual2go.Subscriber {
 	return func(d eventual2go.Data) {
 		sa := d.(service.ServiceArrived)
 		client.Add(NewServiceArrived(sa))
 	}
 }
-func serviceGone(client eventual2go.StreamController) eventual2go.Subscriber {
+func serviceGone(client *eventual2go.StreamController) eventual2go.Subscriber {
 	return func(d eventual2go.Data) {
 		uuid := d.(string)
 		client.Add(NewServiceGone(uuid))

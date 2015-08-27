@@ -16,8 +16,8 @@ type Beacon struct {
 	stop       chan struct {}
 	listenConn *net.UDPConn
 	outConns   []*net.UDPConn
-	in         eventual2go.StreamController
-	silence    *eventual2go.Future
+	in         *eventual2go.StreamController
+	silence    *eventual2go.Completer
 	silent bool
 	logger *log.Logger
 }
@@ -37,7 +37,7 @@ func (b *Beacon) init() {
 	b.in = eventual2go.NewStreamController()
 	b.stop = make(chan struct {})
 	b.outConns = []*net.UDPConn{}
-	b.silence = eventual2go.NewFuture()
+	b.silence = eventual2go.NewCompleter()
 	b.silent = true
 	b.logger = log.New(b.conf.Logger,"beacon ",log.Lshortfile)
 }
@@ -122,13 +122,13 @@ func (b *Beacon) getSignal(c chan struct{}) {
 	defer b.m.Unlock()
 	data := make([]byte, 1024)
 	read, remoteAddr, _ := b.listenConn.ReadFromUDP(data)
-	if !b.in.Closed.IsComplete(){
+	if !b.in.Closed().Completed(){
 		b.in.Add(Signal{remoteAddr.IP[len(remoteAddr.IP)-4:], data[:read]})
 		c <- struct{}{}
 	}
 }
 
-func (b *Beacon) Signals() eventual2go.Stream {
+func (b *Beacon) Signals() *eventual2go.Stream {
 	return b.in.Where(b.noEcho)
 }
 
@@ -146,7 +146,7 @@ func (b *Beacon) Silence() {
 	defer b.m.Unlock()
 	if !b.silent {
 		b.silence.Complete(nil)
-		b.silence = eventual2go.NewFuture()
+		b.silence = eventual2go.NewCompleter()
 		b.silent = true
 	}
 }
@@ -157,7 +157,7 @@ func (b *Beacon) Silent() bool{
 func (b *Beacon) ping(c *net.UDPConn) {
 
 	t := time.NewTimer(b.conf.PingInterval)
-	silence := b.silence.AsChan()
+	silence := b.silence.Future().AsChan()
 	for {
 		select {
 		case <-silence:

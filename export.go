@@ -14,7 +14,7 @@ import (
 type Export struct {
 	*service.Service
 
-	requests eventual2go.Stream
+	requests *eventual2go.Stream
 
 	r *eventual2go.Reactor
 
@@ -44,7 +44,7 @@ func (e *Export) Reply(r *messages.Request, params []byte){
 	e.r.Fire("reply",res)
 }
 
-func (e *Export) Requests() eventual2go.Stream {
+func (e *Export) Requests() *eventual2go.Stream {
 	return e.requests
 }
 

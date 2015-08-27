@@ -13,10 +13,10 @@ import (
 
 type Client struct {
 	
-	arrived eventual2go.Stream
-	gone eventual2go.Stream
+	arrived *eventual2go.Stream
+	gone *eventual2go.Stream
 	
-	stop *eventual2go.Future
+	stop *eventual2go.Completer
 
 	uuid string
 	ad *appdescriptor.AppDescriptor
@@ -29,7 +29,7 @@ type Client struct {
 	daemonPort int
 	daemonPortUdp int
 	
-	daemonConn eventual2go.StreamController
+	daemonConn *eventual2go.StreamController
 	
 	logger *log.Logger
 }
@@ -47,7 +47,7 @@ func NewClient(uuid, localAddr string, daemonAddr string, daemonPortUdp int, ser
 	c.daemonAddr = daemonAddr
 	c.daemonPortUdp = daemonPortUdp
 
-	c.stop = eventual2go.NewFuture()
+	c.stop = eventual2go.NewCompleter()
 
 	incoming, err := connection.NewIncoming(localAddr)
 
@@ -56,7 +56,7 @@ func NewClient(uuid, localAddr string, daemonAddr string, daemonPortUdp int, ser
 	}
 	c.localPort = incoming.Port()
 	c.logger.Println("incoming port is",c.localPort)
-	c.stop.Then(stopIncoming(incoming))
+	c.stop.Future().Then(stopIncoming(incoming))
 
 	msg_in := incoming.In().Where(ValidMessage)
 	c.arrived = msg_in.Where(IsMessage(SERVICE_ARRIVE)).Transform(ToServiceArrivedMessage)
@@ -70,11 +70,11 @@ func (c *Client) Run(){
 	go c.pingUdp()
 }
 
-func (c *Client) Arrived() eventual2go.Stream{
+func (c *Client) Arrived() *eventual2go.Stream{
 	return c.arrived
 }
 
-func (c *Client) Gone() eventual2go.Stream{
+func (c *Client) Gone() *eventual2go.Stream{
 	return c.arrived
 }
 
@@ -115,8 +115,8 @@ func (c *Client) pingUdp() {
 		panic(err)
 	}
 	t := time.NewTimer(pingtime)
-	s := c.stop.AsChan()
-	//	fmt.Println(fmt.Sprintf("Beginning UDP Broadcast with %s",UUID))
+	s := c.stop.Future().AsChan()
+
 	for {
 		select {
 		case <-s:
