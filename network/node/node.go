@@ -16,23 +16,15 @@ import (
 )
 
 type Node struct {
-	mut *sync.RWMutex
-
-	UUID string
-
-	cfg *config.Config
-
-	tags map[string]string
-
-	agents map[string]*agent.Agent
-
+	UUID    string
+	cfg     *config.Config
+	tags    map[string]string
+	agents  map[string]*agent.Agent
 	beacons []*beacon.Beacon
-
-	logger *log.Logger
-
-	join  *eventual2go.StreamController
-	leave *eventual2go.StreamController
-	query *eventual2go.StreamController
+	logger  *log.Logger
+	join    *eventual2go.StreamController
+	leave   *eventual2go.StreamController
+	query   *eventual2go.StreamController
 }
 
 func New(uuid string, cfg *config.Config, tags map[string]string) (node *Node) {
@@ -47,7 +39,6 @@ func New(uuid string, cfg *config.Config, tags map[string]string) (node *Node) {
 
 	node.UUID = uuid
 	node.beacons = []*beacon.Beacon{}
-	node.mut = new(sync.RWMutex)
 	node.logger.Println("Launching Serf Agents")
 
 	node.join = eventual2go.NewStreamController()
