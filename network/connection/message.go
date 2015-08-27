@@ -1,6 +1,6 @@
 package connection
 
 type Message struct {
-	Iface string
+	Iface   string
 	Payload []string
 }

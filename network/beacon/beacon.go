@@ -3,23 +3,23 @@ package beacon
 import (
 	"bytes"
 	"github.com/joernweissenborn/eventual2go"
-	"net"
-	"time"
 	"log"
+	"net"
 	"sync"
+	"time"
 )
 
 type Beacon struct {
-	m *sync.Mutex
-	conf *Config
+	m          *sync.Mutex
+	conf       *Config
 	payload    []byte
-	stop       chan struct {}
+	stop       chan struct{}
 	listenConn *net.UDPConn
 	outConns   []*net.UDPConn
 	in         *eventual2go.StreamController
 	silence    *eventual2go.Completer
-	silent bool
-	logger *log.Logger
+	silent     bool
+	logger     *log.Logger
 }
 
 func New(payload []byte, conf *Config) (b *Beacon) {
@@ -35,13 +35,12 @@ func New(payload []byte, conf *Config) (b *Beacon) {
 
 func (b *Beacon) init() {
 	b.in = eventual2go.NewStreamController()
-	b.stop = make(chan struct {})
+	b.stop = make(chan struct{})
 	b.outConns = []*net.UDPConn{}
 	b.silence = eventual2go.NewCompleter()
 	b.silent = true
-	b.logger = log.New(b.conf.Logger,"beacon ",log.Lshortfile)
+	b.logger = log.New(b.conf.Logger, "beacon ", log.Lshortfile)
 }
-
 
 func (b *Beacon) setup() {
 	b.logger.Println("Setting up")
@@ -61,7 +60,7 @@ func (b *Beacon) Stop() {
 	b.logger.Println("Stopped")
 }
 
-func (b *Beacon) setupSender(){
+func (b *Beacon) setupSender() {
 	for _, addr := range b.conf.PingAddresses {
 		b.setupOutgoing(addr)
 	}
@@ -87,7 +86,7 @@ func (b *Beacon) setupListener() (err error) {
 	var ip net.IP
 	ip = net.IPv4(224, 0, 0, 251)
 
-	b.logger.Printf("Listen Address is %s",ip)
+	b.logger.Printf("Listen Address is %s", ip)
 
 	b.listenConn, err = net.ListenMulticastUDP("udp4", nil, &net.UDPAddr{
 		IP:   ip,
@@ -95,7 +94,6 @@ func (b *Beacon) setupListener() (err error) {
 	})
 	return
 }
-
 
 func (b *Beacon) Run() {
 	go b.listen()
@@ -122,7 +120,7 @@ func (b *Beacon) getSignal(c chan struct{}) {
 	defer b.m.Unlock()
 	data := make([]byte, 1024)
 	read, remoteAddr, _ := b.listenConn.ReadFromUDP(data)
-	if !b.in.Closed().Completed(){
+	if !b.in.Closed().Completed() {
 		b.in.Add(Signal{remoteAddr.IP[len(remoteAddr.IP)-4:], data[:read]})
 		c <- struct{}{}
 	}
@@ -151,7 +149,7 @@ func (b *Beacon) Silence() {
 	}
 }
 
-func (b *Beacon) Silent() bool{
+func (b *Beacon) Silent() bool {
 	return b.silent
 }
 func (b *Beacon) ping(c *net.UDPConn) {

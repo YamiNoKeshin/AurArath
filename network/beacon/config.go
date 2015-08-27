@@ -1,12 +1,12 @@
 package beacon
+
 import (
-	"time"
 	"io"
 	"os"
+	"time"
 )
 
 type Config struct {
-
 	PingAddresses []string
 	//
 	Port int

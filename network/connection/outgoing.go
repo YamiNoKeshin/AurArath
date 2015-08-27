@@ -2,17 +2,17 @@ package connection
 
 import (
 	"fmt"
+	"github.com/joernweissenborn/eventual2go"
 	"github.com/pebbe/zmq4"
 	"sync"
-	"github.com/joernweissenborn/eventual2go"
 )
 
 type Outgoing struct {
 	*sync.Mutex
-	skt         *zmq4.Socket
-	ipportbytes []byte
+	skt           *zmq4.Socket
+	ipportbytes   []byte
 	targetAddress string
-	targetPort int
+	targetPort    int
 }
 
 func NewOutgoing(uuid string, targetAddress string, targetPort int) (out *eventual2go.StreamController, err error) {

@@ -6,18 +6,17 @@ import (
 
 	"fmt"
 	"github.com/joernweissenborn/eventual2go"
-	"time"
 	"sync"
+	"time"
 )
 
 type Incoming struct {
-
 	m *sync.Mutex
 
-	addr string
-	port int
-	skt  *zmq4.Socket
-	in   *eventual2go.StreamController
+	addr    string
+	port    int
+	skt     *zmq4.Socket
+	in      *eventual2go.StreamController
 	stopped bool
 }
 
@@ -46,14 +45,14 @@ func (i *Incoming) setupSocket() (err error) {
 	if err != nil {
 		return
 	}
-	err = i.skt.Bind(fmt.Sprintf("tcp://%s:%d",i.addr, i.port))
+	err = i.skt.Bind(fmt.Sprintf("tcp://%s:%d", i.addr, i.port))
 	return
 }
 
 func getRandomPort() int {
 	l, err := net.Listen("tcp", ":0") // listen on address
 	if err != nil {
-		panic(fmt.Sprintf("Could not find a free port %v",err))
+		panic(fmt.Sprintf("Could not find a free port %v", err))
 	}
 	defer l.Close()
 	return l.Addr().(*net.TCPAddr).Port
@@ -70,7 +69,7 @@ func (i *Incoming) listen() {
 
 			return
 		}
-		sockets, err := poller.Poll(100*time.Millisecond)
+		sockets, err := poller.Poll(100 * time.Millisecond)
 		if err != nil {
 			continue
 		}

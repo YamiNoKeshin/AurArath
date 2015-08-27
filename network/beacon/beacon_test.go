@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-var testconf = &Config{PingAddresses:[]string{"127.0.0.1"},Port: 666, PingInterval:1*time.Millisecond}
+var testconf = &Config{PingAddresses: []string{"127.0.0.1"}, Port: 666, PingInterval: 1 * time.Millisecond}
 
 func TestBeacon(t *testing.T) {
 	b1 := New([]byte("1234"), testconf)
@@ -23,7 +23,7 @@ func TestBeacon(t *testing.T) {
 		if string(data.(Signal).Data) != "HALLO" {
 			t.Error("Wrong data, needed 'HALLO', got", data)
 		}
-	case <-time.After(100*time.Millisecond):
+	case <-time.After(100 * time.Millisecond):
 		t.Error("Didnt got network.beacon 2")
 	}
 
@@ -32,7 +32,7 @@ func TestBeacon(t *testing.T) {
 		if string(data.(Signal).Data) != "1234" {
 			t.Error("Wrong data, needed '1234', got", data)
 		}
-	case <-time.After(100*time.Millisecond):
+	case <-time.After(100 * time.Millisecond):
 		t.Error("Didn't got network.beacon 1")
 	}
 

@@ -6,8 +6,8 @@ import (
 )
 
 type AppDescriptor struct {
-	Functions          []Function
-	Tags               map[string]string
+	Functions []Function
+	Tags      map[string]string
 }
 
 type Function struct {
@@ -16,16 +16,16 @@ type Function struct {
 	Output []Parameter
 }
 
-func (f Function) String()string{
+func (f Function) String() string {
 	inpar := ""
-	for _,p := range f.Input {
-		inpar = fmt.Sprintf("%s,%s",inpar,p)
+	for _, p := range f.Input {
+		inpar = fmt.Sprintf("%s,%s", inpar, p)
 	}
 	outpar := ""
-	for _,p := range f.Output{
-		outpar = fmt.Sprintf("%s,%s",outpar,p)
+	for _, p := range f.Output {
+		outpar = fmt.Sprintf("%s,%s", outpar, p)
 	}
-	return fmt.Sprintf("%s(%s)%s",f.Name,inpar,outpar)
+	return fmt.Sprintf("%s(%s)%s", f.Name, inpar, outpar)
 }
 
 type Parameter struct {
@@ -35,8 +35,8 @@ type Parameter struct {
 
 //name(par:type,...)par:type
 
-func (p Parameter) String()string {
-	return fmt.Sprintf("%s:%s",p.Name,p.Type)
+func (p Parameter) String() string {
+	return fmt.Sprintf("%s:%s", p.Name, p.Type)
 }
 
 func AppDescriptorFromJson(JSON string) (appkey AppDescriptor) {
@@ -47,11 +47,11 @@ func AppDescriptorFromJson(JSON string) (appkey AppDescriptor) {
 	return
 }
 
-func (a AppDescriptor) AsTagSet() (tagset map[string]string){
+func (a AppDescriptor) AsTagSet() (tagset map[string]string) {
 	tagset = a.Tags
 
 	for _, fn := range a.Functions {
-		tagset[fmt.Sprintf("function_%s",fn)] = ""
+		tagset[fmt.Sprintf("function_%s", fn)] = ""
 	}
 	return
 }

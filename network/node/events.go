@@ -1,4 +1,5 @@
 package node
+
 import (
 	"github.com/hashicorp/serf/serf"
 	"github.com/joernweissenborn/eventual2go"
@@ -6,7 +7,7 @@ import (
 
 type QueryEvent struct {
 	Address string
-	Query *serf.Query
+	Query   *serf.Query
 }
 
 func toQueryEvent(iface string) eventual2go.Transformer {
@@ -17,7 +18,7 @@ func toQueryEvent(iface string) eventual2go.Transformer {
 
 type QueryResponseEvent struct {
 	Interface string
-	Response serf.NodeResponse
+	Response  serf.NodeResponse
 }
 
 func toQueryResponseEvent(iface string) eventual2go.Transformer {

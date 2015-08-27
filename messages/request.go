@@ -1,19 +1,19 @@
 package messages
+
 import (
+	"bytes"
+	"encoding/gob"
 	uuid "github.com/nu7hatch/gouuid"
 	"strings"
-	"encoding/gob"
-	"bytes"
 )
 
-
 type Request struct {
-	UUID string
+	UUID     string
 	Importer string
 	Function string
 	CallType CallType
-	Codec Codec
-	params []byte
+	Codec    Codec
+	params   []byte
 }
 
 func NewRequest(importer, function string, call_type CallType, params []byte) (r *Request) {
@@ -27,24 +27,21 @@ func NewRequest(importer, function string, call_type CallType, params []byte) (r
 	return
 }
 
-func(*Request) GetType() MessageType {return REQUEST}
+func (*Request) GetType() MessageType { return REQUEST }
 
-
-func(r *Request) Unflatten(d []string)  {
+func (r *Request) Unflatten(d []string) {
 	dec := gob.NewDecoder(strings.NewReader(d[0]))
 	dec.Decode(r)
 	r.params = []byte(d[1])
 }
 
-func(r *Request) Flatten() [][]byte {
+func (r *Request) Flatten() [][]byte {
 	var payload bytes.Buffer
 	enc := gob.NewEncoder(&payload)
 	enc.Encode(r)
-	return [][]byte{payload.Bytes(),r.params}
+	return [][]byte{payload.Bytes(), r.params}
 }
 
-func(r *Request) Parameter() []byte {
+func (r *Request) Parameter() []byte {
 	return r.params
 }
-
-

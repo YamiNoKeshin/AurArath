@@ -1,10 +1,9 @@
 package messages
+
 import (
 	"encoding/gob"
 	"github.com/joernweissenborn/eventual2go"
 )
-
-
 
 //go:generate stringer -type=MessageType
 
@@ -19,26 +18,26 @@ const (
 	STOP_LISTEN
 )
 
-func Get(messagetype MessageType) (msg Message){
+func Get(messagetype MessageType) (msg Message) {
 
 	switch messagetype {
 	case HELLO:
-		msg =new(Hello)
+		msg = new(Hello)
 	case HELLO_OK:
-		msg =new(HelloOk)
+		msg = new(HelloOk)
 	case REQUEST:
-		msg=new(Request)
+		msg = new(Request)
 	case RESULT:
-		msg=new(Result)
+		msg = new(Result)
 	case LISTEN:
-		msg=new(Listen)
+		msg = new(Listen)
 	case STOP_LISTEN:
-		msg=new(StopListen)
+		msg = new(StopListen)
 	}
 	return
 }
 
-func init(){
+func init() {
 	gob.Register(Hello{})
 	gob.Register(HelloOk{})
 	gob.Register(Request{})
@@ -47,5 +46,6 @@ func init(){
 
 func Is(t MessageType) eventual2go.Filter {
 	return func(d eventual2go.Data) bool {
-		return d.(IncomingMessage).Msg.GetType() == t}
+		return d.(IncomingMessage).Msg.GetType() == t
+	}
 }

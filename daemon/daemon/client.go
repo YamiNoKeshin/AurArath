@@ -1,43 +1,43 @@
 package daemon
+
 import (
+	"fmt"
+	"github.com/joernweissenborn/aurarath/appdescriptor"
 	"github.com/joernweissenborn/aurarath/network/connection"
 	"github.com/joernweissenborn/eventual2go"
 	"log"
-	"time"
 	"net"
-	"fmt"
-	"github.com/joernweissenborn/aurarath/appdescriptor"
 	"os"
 	"strconv"
+	"time"
 )
 
 type Client struct {
-	
 	arrived *eventual2go.Stream
-	gone *eventual2go.Stream
-	
+	gone    *eventual2go.Stream
+
 	stop *eventual2go.Completer
 
-	uuid string
-	ad *appdescriptor.AppDescriptor
+	uuid        string
+	ad          *appdescriptor.AppDescriptor
 	servicetype string
-	addresses []string
+	addresses   []string
 
-	localAddr string
-	localPort int
-	daemonAddr string
-	daemonPort int
+	localAddr     string
+	localPort     int
+	daemonAddr    string
+	daemonPort    int
 	daemonPortUdp int
-	
+
 	daemonConn *eventual2go.StreamController
-	
+
 	logger *log.Logger
 }
 
-func NewClient(uuid, localAddr string, daemonAddr string, daemonPortUdp int, servicetype string, ad *appdescriptor.AppDescriptor, addresses []string)(c *Client){
-	
+func NewClient(uuid, localAddr string, daemonAddr string, daemonPortUdp int, servicetype string, ad *appdescriptor.AppDescriptor, addresses []string) (c *Client) {
+
 	c = new(Client)
-	c.logger = log.New(os.Stdout,"client ",log.Lshortfile)
+	c.logger = log.New(os.Stdout, "client ", log.Lshortfile)
 	c.logger.Println("starting")
 	c.uuid = uuid
 	c.ad = ad
@@ -55,7 +55,7 @@ func NewClient(uuid, localAddr string, daemonAddr string, daemonPortUdp int, ser
 		panic(err)
 	}
 	c.localPort = incoming.Port()
-	c.logger.Println("incoming port is",c.localPort)
+	c.logger.Println("incoming port is", c.localPort)
 	c.stop.Future().Then(stopIncoming(incoming))
 
 	msg_in := incoming.In().Where(ValidMessage)
@@ -65,16 +65,16 @@ func NewClient(uuid, localAddr string, daemonAddr string, daemonPortUdp int, ser
 	return
 }
 
-func (c *Client) Run(){
+func (c *Client) Run() {
 	c.logger.Println("starting")
 	go c.pingUdp()
 }
 
-func (c *Client) Arrived() *eventual2go.Stream{
+func (c *Client) Arrived() *eventual2go.Stream {
 	return c.arrived
 }
 
-func (c *Client) Gone() *eventual2go.Stream{
+func (c *Client) Gone() *eventual2go.Stream {
 	return c.arrived
 }
 
@@ -88,11 +88,11 @@ func stopIncoming(i *connection.Incoming) eventual2go.CompletionHandler {
 func (c *Client) onHello(d eventual2go.Data) {
 	m := d.(connection.Message)
 	strport := string(m.Payload[3])
-	port,_ := strconv.ParseInt(strport,0,0)
-	c.logger.Println("got hello from daemon on port",port)
+	port, _ := strconv.ParseInt(strport, 0, 0)
+	c.logger.Println("got hello from daemon on port", port)
 	c.daemonPort = int(port)
-	c.daemonConn, _ = connection.NewOutgoing(c.uuid,c.daemonAddr,c.daemonPort)
-	h := NewService{c.uuid,c.ad,c.addresses,c.servicetype}
+	c.daemonConn, _ = connection.NewOutgoing(c.uuid, c.daemonAddr, c.daemonPort)
+	h := NewService{c.uuid, c.ad, c.addresses, c.servicetype}
 	c.daemonConn.Add(h.flatten())
 }
 
@@ -100,16 +100,16 @@ func (c *Client) pingUdp() {
 
 	var pingtime = 1 * time.Second
 
-	localAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:0",c.localAddr))
+	localAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:0", c.localAddr))
 	if err != nil {
 		panic(err)
 	}
-	daemonAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d",c.daemonAddr,c.daemonPortUdp))
+	daemonAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", c.daemonAddr, c.daemonPortUdp))
 
 	if err != nil {
 		panic(err)
 	}
-	c.logger.Println("starting to pindg address",daemonAddr)
+	c.logger.Println("starting to pindg address", daemonAddr)
 	con, err := net.DialUDP("udp", localAddr, daemonAddr)
 	if err != nil {
 		panic(err)
@@ -123,13 +123,13 @@ func (c *Client) pingUdp() {
 			return
 
 		case <-t.C:
-			con.Write([]byte(fmt.Sprintf("%s:%d", c.uuid,c.localPort)))
+			con.Write([]byte(fmt.Sprintf("%s:%d", c.uuid, c.localPort)))
 			t.Reset(pingtime)
 		}
 	}
 
 }
 
-func (c *Client) Stop(){
+func (c *Client) Stop() {
 	c.stop.Complete(nil)
 }

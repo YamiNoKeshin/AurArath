@@ -1,29 +1,27 @@
 package messages
+
 import (
-	"strings"
-	"encoding/gob"
 	"bytes"
+	"encoding/gob"
+	"strings"
 )
 
-
 type Hello struct {
-	Codecs []byte
+	Codecs  []byte
 	Address string
-	Port int
+	Port    int
 }
 
-func(*Hello) GetType() MessageType {return HELLO}
+func (*Hello) GetType() MessageType { return HELLO }
 
-
-func(h *Hello) Unflatten(d []string)  {
+func (h *Hello) Unflatten(d []string) {
 	dec := gob.NewDecoder(strings.NewReader(d[0]))
 	dec.Decode(&h)
 }
 
-func(h *Hello) Flatten() [][]byte {
+func (h *Hello) Flatten() [][]byte {
 	var payload bytes.Buffer
 	enc := gob.NewEncoder(&payload)
 	enc.Encode(h)
 	return [][]byte{payload.Bytes()}
 }
-
