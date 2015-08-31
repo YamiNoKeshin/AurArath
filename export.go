@@ -11,6 +11,7 @@ import (
 )
 
 type Export struct {
+<<<<<<< HEAD
 	*service.Service
 
 	requests *eventual2go.Stream
@@ -100,6 +101,15 @@ func (e *Export) stopListener(d eventual2go.Data) {
 	}
 	if index == -1 {
 		return
+=======
+	AppKey *AppKey
+	nodes  []*network.Node
+}
+
+func NewExport(config *Config, key *AppKey) {
+	exp := &Export{
+		AppKey: key,
+>>>>>>> 9662249fbabc683e2a4371d4ec5052b3d5b687a3
 	}
 	ls[index] = ls[len(ls)-1]
 	e.listeners[f] = ls[:len(ls)-2]
@@ -114,6 +124,7 @@ func (e *Export) deliverResult(d eventual2go.Data) {
 			sc.Send(messages.Flatten(result))
 		}
 
+<<<<<<< HEAD
 	case messages.MANY2MANY, messages.MANY2ONE:
 		res := messages.Flatten(result)
 		e.logger.Printf("sending many2 result to %d clients", len(e.listeners))
@@ -122,4 +133,11 @@ func (e *Export) deliverResult(d eventual2go.Data) {
 			e.GetConnectedService(uuid).Send(res)
 		}
 	}
+=======
+	for _, iface := range config.NetworkInterfaces {
+		exp.nodes = append(exp.nodes, network.NewNode(iface, config.Logger()))
+	}
+
+	return exp
+>>>>>>> 9662249fbabc683e2a4371d4ec5052b3d5b687a3
 }

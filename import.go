@@ -22,6 +22,7 @@ type Import struct {
 	logger *log.Logger
 }
 
+<<<<<<< HEAD
 func NewImport(a *appdescriptor.AppDescriptor, cfg *config.Config) (i *Import) {
 	i = new(Import)
 	i.Service = service.NewService(a, service.IMPORTING, cfg, []byte{0})
@@ -36,10 +37,16 @@ func (i *Import) sendListenFunctions(d eventual2go.Data) {
 	sc := d.(*service.ServiceConnection)
 	for _, f := range i.listen {
 		sc.Send(messages.Flatten(&messages.Listen{f}))
+=======
+func NewImport(config *Config, key *AppKey) *Import {
+	imp := &Import{
+		AppKey: key,
+>>>>>>> 9662249fbabc683e2a4371d4ec5052b3d5b687a3
 	}
 	return
 }
 
+<<<<<<< HEAD
 func (i *Import) Call(function string, parameter []byte) (f *eventual2go.Future) {
 	i.logger.Println("Call", function)
 	uuid := i.call(function, parameter, messages.ONE2ONE)
@@ -63,9 +70,14 @@ func (i *Import) Listen(function string) {
 	i.listen = append(i.listen, function)
 	for _, sc := range i.GetConnectedServices() {
 		sc.Send(messages.Flatten(&messages.Listen{function}))
+=======
+	for _, iface := range config.NetworkInterfaces {
+		imp.nodes = append(imp.nodes, network.NewNode(iface, config.Logger()))
+>>>>>>> 9662249fbabc683e2a4371d4ec5052b3d5b687a3
 	}
 }
 
+<<<<<<< HEAD
 func (i *Import) StopListen(function string) {
 	index := -1
 	for i, f := range i.listen {
@@ -82,6 +94,9 @@ func (i *Import) StopListen(function string) {
 	for _, sc := range i.GetConnectedServices() {
 		sc.Send(messages.Flatten(&messages.StopListen{function}))
 	}
+=======
+	return imp
+>>>>>>> 9662249fbabc683e2a4371d4ec5052b3d5b687a3
 }
 
 func (i *Import) Trigger(function string, parameter []byte) {
